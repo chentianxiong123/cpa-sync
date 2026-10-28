@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 调试/临时
+_forensics/
+*.bak.*
+*.db-shm
+*.db-wal
+*.tmp
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+
+# 发行产物
+dist/
+build/

@@ -1,0 +1,47 @@
+# cpa-sync 中央配置 —— 唯一事实来源
+# 你在这里填写 CPA 的 IP / 密钥 / 模型白名单，cpa-sync apply 一键分发到所有下游。
+# 修改后运行: cpa-sync apply   或   cpa-sync check（只看不改）
+
+cpa:
+  # CPA (cli-proxy-api) 网关地址 —— meilan-phone1
+  base_url: "http://192.168.31.213:8317/v1"
+  # CPA 的 API key
+  api_key: "123456"
+
+  # 模型：留空 = 动态扫 CPA 的 /v1/models，扫出什么就配什么（用户期望）
+  # 若只想配部分模型，才在这里列白名单（支持带前缀 sensenova/deepseek-v4-flash）
+  include_models: []
+
+  # 排除清单（支持通配符，* 匹配任意字符）。默认空 = 全配。
+  exclude_models: []
+
+  # 全局上下文窗口（tokens）：所有下游统一。500K = 512000
+  context_window: 512000
+  # 全局最大输出 tokens
+  max_tokens: 16384
+  # codex 的自动压缩阈值（model_auto_compact_token_limit）：
+  # 与 context_window 一起由中央配置统一控制，改这里即全改（codex 专属）
+  auto_compact_token_limit: 300000
+
+  # 每个模型的覆盖字段（可选）：contextWindow / maxTokens / input / reasoning
+  # 模型级覆盖优先于全局 context_window。
+  model_overrides:
+    sensenova-6.8-flash-lite:
+      input: ["text", "image"]
+
+# 模型同步策略:
+#   merge   = 只增不删：补上白名单里缺的，但保留下游已有的额外模型
+#   replace = 全盘对齐：下游严格等于 CPA 扫出的模型（白名单没有的会被删除）
+# 注意：base_url / api_key 始终精确覆盖，不受此策略影响。
+# 当前固定 replace：每次同步都重新对齐 CPA 模型，不留旧模型。
+strategy: replace
+
+# 要同步的下游应用（adapter 名）。空 = 全部已注册的 adapter。
+# 对应 adapters/ 下的模块：pi / opencode / claude / codex / omp / dsh
+targets:
+  - dsh
+  - omp
+  - pi
+  - opencode
+  - claude
+  - codex

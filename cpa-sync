@@ -1,0 +1,353 @@
+#!/usr/bin/env python3
+"""cpa-sync —— CPA 配置一键同步 CLI。
+
+用法:
+  cpa-sync models                  # 打印 CPA 暴露的全部模型
+  cpa-sync list                    # 列出各 adapter 当前状态 + 与目标差异
+  cpa-sync check [adapter...]      # dry-run：只对比不写
+  cpa-sync apply [adapter...]      # 真正同步（默认先备份）
+  cpa-sync doctor                  # 诊断连接/配置问题
+
+项目根: /mnt/shared/cpa-sync
+"""
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+# 确保能 import core/adapters 包
+ROOT = Path(__file__).resolve().parent
+
+# 项目版本（发版时递增）
+VERSION = "1.0.0"
+sys.path.insert(0, str(ROOT))
+
+from core.cpa_client import CPAClient, CPAError  # noqa: E402
+from core.config import SyncConfig, build_provider_ir  # noqa: E402
+from adapters import available_names, get_adapter  # noqa: E402
+
+
+def load_config(args) -> SyncConfig:
+    return SyncConfig.load(args.config)
+
+
+def make_client(cfg: SyncConfig) -> CPAClient:
+    return CPAClient(cfg.cpa.base_url, cfg.cpa.api_key)
+
+
+def pick_adapters(cfg: SyncConfig, names: list[str]) -> list[str]:
+    """返回要处理的 adapter 名（按 config.targets + 命令行过滤）。"""
+    all_n = available_names()
+    if names:
+        for n in names:
+            if n not in all_n:
+                raise SystemExit(f"未知 adapter: {n}（可用: {all_n}）")
+        return names
+    if cfg.targets:
+        return [n for n in cfg.targets if n in all_n]
+    return all_n
+
+
+def cmd_models(args) -> int:
+    cfg = load_config(args)
+    client = make_client(cfg)
+    try:
+        models = client.list_models()
+    except CPAError as e:
+        print(f"✗ 无法连接 CPA: {e}", file=sys.stderr)
+        return 1
+    print(f"CPA ({cfg.cpa.base_url}) 暴露 {len(models)} 个模型:")
+    for m in models:
+        print(f"  - {m.id}")
+    return 0
+
+
+def cmd_check(args) -> int:
+    cfg = load_config(args)
+    client = make_client(cfg)
+    try:
+        cpa_models = client.list_models()
+    except CPAError as e:
+        print(f"✗ 无法连接 CPA: {e}", file=sys.stderr)
+        return 1
+    target_ir = build_provider_ir(cfg, cpa_models)
+    print(f"目标 CPA: {target_ir.base_url}  key={'****'}  模型={len(target_ir.models)}")
+    for name in pick_adapters(cfg, args.targets):
+        ad = get_adapter(name, config=cfg)
+        try:
+            tgt = ad.merge_with_current(target_ir)
+            diffs = ad.check(tgt)
+        except Exception as e:
+            print(f"  [{name}] ⚠ 读取失败: {e}")
+            continue
+        if diffs:
+            print(f"  [{name}] 需要同步:")
+            for d in diffs:
+                print(d)
+        else:
+            print(f"  [{name}] ✓ 已是最新")
+    return 0
+
+
+def cmd_list(args) -> int:
+    cfg = load_config(args)
+    client = make_client(cfg)
+    try:
+        cpa_models = client.list_models()
+    except CPAError as e:
+        print(f"✗ 无法连接 CPA: {e}", file=sys.stderr)
+        return 1
+    target_ir = build_provider_ir(cfg, cpa_models)
+    print(f"CPA: {cfg.cpa.base_url}  目标模型: {', '.join(target_ir.model_ids())}")
+    for name in pick_adapters(cfg, args.targets):
+        ad = get_adapter(name, config=cfg)
+        try:
+            cur = ad.load_current()
+        except Exception as e:
+            print(f"  {name:12s} ⚠ {e}")
+            continue
+        if cur is None:
+            print(f"  {name:12s} (未配置)")
+        else:
+            print(f"  {name:12s} {cur.base_url}  models={', '.join(cur.model_ids())}")
+    return 0
+
+
+def cmd_apply(args) -> int:
+    cfg = load_config(args)
+    client = make_client(cfg)
+    try:
+        cpa_models = client.list_models()
+    except CPAError as e:
+        print(f"✗ 无法连接 CPA: {e}", file=sys.stderr)
+        return 1
+    target_ir = build_provider_ir(cfg, cpa_models)
+    ok = 0
+    for name in pick_adapters(cfg, args.targets):
+        ad = get_adapter(name, config=cfg)
+        try:
+            cur = ad.load_current()
+            tgt = ad.merge_with_current(target_ir)  # 应用策略（只增不删/全盘对齐）
+            diffs = ad.diff(cur, tgt)
+        except Exception as e:
+            print(f"  [{name}] ⚠ 读取失败: {e}")
+            continue
+        if not diffs:
+            print(f"  [{name}] ✓ 已是最新，跳过")
+            ok += 1
+            continue
+        print(f"  [{name}] 同步:")
+        for d in diffs:
+            print(d)
+        if not args.yes:
+            ans = input("  确认写入? [y/N] ").strip().lower()
+            if ans != "y":
+                print(f"  [{name}] 跳过")
+                continue
+        try:
+            rendered = ad.render(tgt)
+            ad.write(rendered)
+            print(f"  [{name}] ✓ 已写入")
+            ok += 1
+        except Exception as e:
+            print(f"  [{name}] ✗ 写入失败: {e}", file=sys.stderr)
+    print(f"完成: {ok} 个")
+    return 0
+
+
+def cmd_doctor(args) -> int:
+    cfg = load_config(args)
+    client = make_client(cfg)
+    print("== CPA 连接检查 ==")
+    try:
+        models = client.list_models()
+        print(f"  ✓ {cfg.cpa.base_url} 可达，暴露 {len(models)} 个模型")
+    except CPAError as e:
+        print(f"  ✗ {e}")
+        return 1
+    print("== 模型白名单校验 ==")
+    avail = {m.id for m in models}
+    for mid in cfg.cpa.include_models:
+        if mid in avail or any(mid.endswith(f"/{x}") for x in avail if "/" not in mid):
+            print(f"  ✓ {mid}")
+        else:
+            print(f"  ⚠ {mid} 不在 CPA 暴露列表（可能被排除/不存在）")
+    print("== adapter 健康 ==")
+    for name in pick_adapters(cfg, []):
+        ad = get_adapter(name, config=cfg)
+        try:
+            cur = ad.load_current()
+            if cur is None:
+                print(f"  {name}: 未配置")
+                continue
+            # 幽灵模型检测：下游有、但 CPA 不暴露
+            ghosts = [m.id for m in cur.models if m.id not in avail]
+            print(f"  {name}: {cur.base_url}  models={len(cur.model_ids())}")
+            if ghosts:
+                print(f"       ⚠ 幽灵模型(CPA 不暴露): {', '.join(ghosts)}  → 用 replace 策略清理")
+        except Exception as e:
+            print(f"  {name}: ⚠ {e}")
+    return 0
+
+
+def _fmt_models(ids: list[str]) -> str:
+    if not ids:
+        return "(无)"
+    s = ", ".join(ids)
+    return s if len(s) <= 60 else s[:57] + "..."
+
+
+def cmd_sync_interactive(args) -> int:
+    """交互式向导：列出所有 target + 当前状态，让用户选择/确认。"""
+    cfg = load_config(args)
+    client = make_client(cfg)
+    try:
+        cpa_models = client.list_models()
+    except CPAError as e:
+        print(f"✗ 无法连接 CPA: {e}", file=sys.stderr)
+        return 1
+    target_ir = build_provider_ir(cfg, cpa_models)
+
+    print()
+    print("═" * 56)
+    print("  CPA 一键同步")
+    print("═" * 56)
+    print(f"  权威配置 : {cfg.path}")
+    print(f"  CPA      : {cfg.cpa.base_url}")
+    print(f"  目标模型 : {_fmt_models(target_ir.model_ids())}")
+    print()
+
+    # 收集每个 target 的差异
+    names = pick_adapters(cfg, getattr(args, "targets", []) or [])
+    rows = []
+    for name in names:
+        ad = get_adapter(name, config=cfg)
+        try:
+            cur = ad.load_current()
+            tgt = ad.merge_with_current(target_ir)  # 应用策略
+            diffs = ad.diff(cur, tgt)
+        except Exception as e:
+            rows.append((name, None, [f"  ⚠ 读取失败: {e}"]))
+            continue
+        rows.append((name, cur, diffs))
+
+    need = [r for r in rows if r[2] and not r[2][0].startswith("  ⚠")]
+
+    print("  下游 agent 状态:")
+    for i, (name, cur, diffs) in enumerate(rows, 1):
+        if not diffs:
+            print(f"   [{i}] {name:14s} ✓ 已是最新 ({cur.base_url if cur else '未配置'})")
+        elif diffs[0].startswith("  ⚠"):
+            print(f"   [{i}] {name:14s} ⚠ {diffs[0].strip()}")
+        else:
+            print(f"   [{i}] {name:14s} ⚠ 需要同步")
+    print()
+
+    if not need:
+        print("  ✓ 所有 target 已是最新，无需同步。")
+        return 0
+
+    print(f"  以下 {len(need)} 个需要同步:")
+    for name, cur, diffs in need:
+        print(f"    ── {name} ──")
+        for d in diffs:
+            print(f"     {d}")
+    print()
+
+    if getattr(args, "yes", False) or not sys.stdin.isatty():
+        chosen = [n for n, _, _ in need]
+        if getattr(args, "yes", False):
+            print("  (--yes 跳过交互，同步全部需同步项)")
+    else:
+        try:
+            ans = input("  输入序号或名称选择要同步的 [默认=全部需同步，q=退出]: ").strip()
+        except EOFError:
+            chosen = [n for n, _, _ in need]
+        else:
+            if ans.lower() == "q":
+                print("  已取消")
+                return 0
+            chosen = _resolve_choice(ans, need)
+    if not chosen:
+        print("  ✗ 无效选择，已取消")
+        return 0
+
+    ok = 0
+    for name in chosen:
+        ad = get_adapter(name, config=cfg)
+        try:
+            tgt = ad.merge_with_current(target_ir)
+            rendered = ad.render(tgt)
+            ad.write(rendered, backup=args.backup)
+            print(f"  ✓ {name} 已同步")
+            ok += 1
+        except Exception as e:
+            print(f"  ✗ {name} 同步失败: {e}")
+    print(f"\n  完成: {ok}/{len(chosen)} 个")
+    print("=" * 56)
+    return 0
+
+
+def _resolve_choice(ans: str, need: list) -> list[str]:
+    """解析用户选择：all/数字/名称/逗号分隔。"""
+    if not ans:
+        return [n for n, _, _ in need]
+    if ans.lower() == "all":
+        return [n for n, _, _ in need]
+    picked = []
+    for part in ans.replace(" ", "").split(","):
+        if not part:
+            continue
+        if part.isdigit():
+            idx = int(part) - 1
+            if 0 <= idx < len(need):
+                picked.append(need[idx][0])
+        else:
+            for n, _, _ in need:
+                if n == part:
+                    picked.append(n)
+    return list(dict.fromkeys(picked))
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(prog="cpa-sync", description="CPA 配置一键同步")
+    p.add_argument("--config", default=None, help="中央配置路径")
+    p.add_argument("--version", action="version", version=f"cpa-sync {VERSION}")
+    sub = p.add_subparsers(dest="cmd")
+
+    s = sub.add_parser("models", help="打印 CPA 暴露的模型")
+    s.set_defaults(fn=cmd_models)
+
+    s = sub.add_parser("list", help="列出各 adapter 当前状态")
+    s.add_argument("targets", nargs="*", help="adapter 名，空=全部")
+    s.set_defaults(fn=cmd_list)
+
+    s = sub.add_parser("check", help="dry-run 对比")
+    s.add_argument("targets", nargs="*", help="adapter 名，空=全部")
+    s.set_defaults(fn=cmd_check)
+
+    s = sub.add_parser("apply", help="真正同步")
+    s.add_argument("targets", nargs="*", help="adapter 名，空=全部")
+    s.add_argument("-y", "--yes", action="store_true", help="跳过确认")
+    s.add_argument("--backup", action="store_true", default=False, help="写 cc-switch.db 前自动备份（默认关）")
+    s.set_defaults(fn=cmd_apply)
+
+    s = sub.add_parser("doctor", help="诊断")
+    s.set_defaults(fn=cmd_doctor)
+
+    s = sub.add_parser("sync", help="交互式同步向导")
+    s.add_argument("targets", nargs="*", help="限定 adapter 名")
+    s.add_argument("-y", "--yes", action="store_true", help="跳过交互，同步全部需同步项")
+    s.add_argument("--backup", action="store_true", default=False, help="写 cc-switch.db 前自动备份（默认关）")
+    s.set_defaults(fn=cmd_sync_interactive)
+
+    args = p.parse_args(argv)
+    # 无子命令 = 启动交互式向导（默认动作）
+    if not getattr(args, "fn", None):
+        args.fn = cmd_sync_interactive
+    return args.fn(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
