@@ -93,3 +93,22 @@ python3 -m pytest tests/    # 跑测试
 ```
 
 新 adapter：继承 `adapters.base.Adapter`，实现 `load_current / render / write`，注册到 `adapters/__init__.py`。
+
+## GUI（PySide6）
+
+```bash
+./cpa-sync-gui          # 启动图形界面
+```
+
+GUI 是 CLI 的图形外壳（复用全部 cmd_* 逻辑，零重复）：
+- **📡 模型**：扫描 CPA 当前模型
+- **📋 状态**：各 agent 当前配置
+- **🔍 检查(干跑)**：看 diff 不改
+- **🚀 同步**：一键下发
+- **🩺 诊断**：doctor
+- **🔄 重载配置**：重新读 cpa-config.yaml
+
+依赖装在 `.venv/`（`PySide6-Essentials`，不含 WebEngine）。首次：
+```bash
+python3 -m venv .venv && .venv/bin/pip install PySide6-Essentials PyYAML
+```

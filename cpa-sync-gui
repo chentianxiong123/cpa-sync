@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# cpa-sync GUI 启动器 —— 用 venv 里的 PySide6 跑 GUI
+set -e
+cd "$(dirname "$0")"
+if [ ! -x ".venv/bin/python" ]; then
+    echo "✗ 未找到 .venv，先建环境: python3 -m venv .venv && .venv/bin/pip install PySide6 PyYAML" >&2
+    exit 1
+fi
+exec .venv/bin/python gui/app.py "$@"
