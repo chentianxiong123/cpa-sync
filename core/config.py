@@ -20,8 +20,8 @@ DEFAULT_CONFIG_PATH = os.environ.get(
 class CPASettings:
     """CPA 连接信息 + 模型选择。"""
 
-    base_url: str = "http://192.168.31.213:8317/v1"
-    api_key: str = "123456"
+    base_url: str = "http://YOUR_CPA_IP:8317/v1"
+    api_key: str = "YOUR_CPA_API_KEY"
     include_models: list[str] = field(default_factory=list)  # 空 = 全部
     exclude_models: list[str] = field(default_factory=list)  # 支持通配符
     # 全局上下文窗口（默认 500K，所有下游统一）
@@ -53,8 +53,8 @@ class SyncConfig:
         cpa_raw = raw.get("cpa", {}) or {}
         return cls(
             cpa=CPASettings(
-                base_url=cpa_raw.get("base_url", "http://192.168.31.213:8317/v1"),
-                api_key=str(cpa_raw.get("api_key", "123456")),
+                base_url=cpa_raw.get("base_url", "http://YOUR_CPA_IP:8317/v1"),
+                api_key=str(cpa_raw.get("api_key", "YOUR_CPA_API_KEY")),
                 include_models=list(cpa_raw.get("include_models", []) or []),
                 exclude_models=list(cpa_raw.get("exclude_models", []) or []),
                 context_window=int(cpa_raw.get("context_window", 512000) or 512000),

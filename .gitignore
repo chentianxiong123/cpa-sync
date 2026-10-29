@@ -5,6 +5,9 @@ __pycache__/
 .venv/
 venv/
 
+# 本地真实配置（含 base_url/api_key，不进仓库）
+config/cpa-config.yaml
+
 # 调试/临时
 _forensics/
 *.bak.*

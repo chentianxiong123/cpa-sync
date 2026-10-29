@@ -47,12 +47,15 @@ cd /mnt/shared/cpa-sync
 ./cpa-sync --version               # 版本
 ```
 
-## 中央配置（`config/cpa-config.yaml`）
+## 中央配置（`config/cpa-config.yaml`，真实值，不进仓库）
+
+> 真实配置 `config/cpa-config.yaml` 已被 .gitignore 排除；仓库只带脱敏模板 `config/cpa-config.example.yaml`。
+> 新机器：`cp config/cpa-config.example.yaml config/cpa-config.yaml` 再填真实值。
 
 ```yaml
 cpa:
-  base_url: "http://192.168.31.213:8317/v1"   # CPA 网关
-  api_key: "123456"
+  base_url: "http://YOUR_CPA_IP:8317/v1"   # CPA 网关（换成你的）
+  api_key: "YOUR_CPA_API_KEY"
   include_models: []        # 空 = 动态扫 /v1/models，扫出什么配什么
   exclude_models: []        # 通配符排除
   context_window: 512000    # 所有下游统一（pi/opencode/dsh/omp 的 contextWindow + codex 的 model_context_window）

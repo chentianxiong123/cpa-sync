@@ -1,12 +1,17 @@
-# cpa-sync 中央配置 —— 唯一事实来源
+# cpa-sync 中央配置 —— 模板（脱敏，供参考/发行）
+#
+# 真实配置放 config/cpa-config.yaml（已 .gitignore，不进仓库）。
+# 用法：cp config/cpa-config.example.yaml config/cpa-config.yaml
+#       然后填你的 base_url / api_key。
+#
 # 你在这里填写 CPA 的 IP / 密钥 / 模型白名单，cpa-sync apply 一键分发到所有下游。
 # 修改后运行: cpa-sync apply   或   cpa-sync check（只看不改）
 
 cpa:
-  # CPA (cli-proxy-api) 网关地址 —— meilan-phone1
-  base_url: "http://192.168.31.213:8317/v1"
-  # CPA 的 API key
-  api_key: "123456"
+  # CPA (cli-proxy-api) 网关地址 —— 替换成你的
+  base_url: "http://YOUR_CPA_IP:8317/v1"
+  # CPA 的 API key —— 替换成你的
+  api_key: "YOUR_CPA_API_KEY"
 
   # 模型：留空 = 动态扫 CPA 的 /v1/models，扫出什么就配什么（用户期望）
   # 若只想配部分模型，才在这里列白名单（支持带前缀 sensenova/deepseek-v4-flash）
@@ -15,13 +20,13 @@ cpa:
   # 排除清单（支持通配符，* 匹配任意字符）。默认空 = 全配。
   exclude_models: []
 
-  # 全局上下文窗口（tokens）：所有下游统一。500K = 512000
-  context_window: 512000
+  # 全局上下文窗口（tokens）：所有下游统一
+  context_window: 256000
   # 全局最大输出 tokens
   max_tokens: 16384
   # codex 的自动压缩阈值（model_auto_compact_token_limit）：
   # 与 context_window 一起由中央配置统一控制，改这里即全改（codex 专属）
-  auto_compact_token_limit: 300000
+  auto_compact_token_limit: 200000
 
   # 每个模型的覆盖字段（可选）：contextWindow / maxTokens / input / reasoning
   # 模型级覆盖优先于全局 context_window。
