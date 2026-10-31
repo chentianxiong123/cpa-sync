@@ -40,6 +40,10 @@ class Adapter(abc.ABC):
         """把 render() 结果写入目标应用。backup=True 时写前自动备份。"""
 
     # ---- 子类可选覆写 ----
+    def iter_instances(self) -> list[tuple[str, "Adapter"]]:
+        """返回 [(接入点名, adapter)]。默认单实例；远程多机接入点可覆写。"""
+        return [("default", self)]
+
     def backup(self, path: str | Path, backup_dir: str | None = None) -> str | None:
         """写入前备份单个文件，返回备份路径。"""
         p = Path(path)

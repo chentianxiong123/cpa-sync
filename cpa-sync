@@ -75,18 +75,20 @@ def cmd_check(args) -> int:
     print(f"目标 CPA: {target_ir.base_url}  key={'****'}  模型={len(target_ir.models)}")
     for name in pick_adapters(cfg, args.targets):
         ad = get_adapter(name, config=cfg)
-        try:
-            tgt = ad.merge_with_current(target_ir)
-            diffs = ad.check(tgt)
-        except Exception as e:
-            print(f"  [{name}] ⚠ 读取失败: {e}")
-            continue
-        if diffs:
-            print(f"  [{name}] 需要同步:")
-            for d in diffs:
-                print(d)
-        else:
-            print(f"  [{name}] ✓ 已是最新")
+        for inst_name, inst in ad.iter_instances():
+            tag = f"{name}@{inst_name}" if inst_name != "default" else name
+            try:
+                tgt = inst.merge_with_current(target_ir)
+                diffs = inst.check(tgt)
+            except Exception as e:
+                print(f"  [{tag}] ⚠ 读取失败: {e}")
+                continue
+            if diffs:
+                print(f"  [{tag}] 需要同步:")
+                for d in diffs:
+                    print(d)
+            else:
+                print(f"  [{tag}] ✓ 已是最新")
     return 0
 
 
@@ -102,15 +104,17 @@ def cmd_list(args) -> int:
     print(f"CPA: {cfg.cpa.base_url}  目标模型: {', '.join(target_ir.model_ids())}")
     for name in pick_adapters(cfg, args.targets):
         ad = get_adapter(name, config=cfg)
-        try:
-            cur = ad.load_current()
-        except Exception as e:
-            print(f"  {name:12s} ⚠ {e}")
-            continue
-        if cur is None:
-            print(f"  {name:12s} (未配置)")
-        else:
-            print(f"  {name:12s} {cur.base_url}  models={', '.join(cur.model_ids())}")
+        for inst_name, inst in ad.iter_instances():
+            tag = f"{name}@{inst_name}" if inst_name != "default" else name
+            try:
+                cur = inst.load_current()
+            except Exception as e:
+                print(f"  {tag:14s} ⚠ {e}")
+                continue
+            if cur is None:
+                print(f"  {tag:14s} (未配置)")
+            else:
+                print(f"  {tag:14s} {cur.base_url}  models={', '.join(cur.model_ids())}")
     return 0
 
 
@@ -126,32 +130,34 @@ def cmd_apply(args) -> int:
     ok = 0
     for name in pick_adapters(cfg, args.targets):
         ad = get_adapter(name, config=cfg)
-        try:
-            cur = ad.load_current()
-            tgt = ad.merge_with_current(target_ir)  # 应用策略（只增不删/全盘对齐）
-            diffs = ad.diff(cur, tgt)
-        except Exception as e:
-            print(f"  [{name}] ⚠ 读取失败: {e}")
-            continue
-        if not diffs:
-            print(f"  [{name}] ✓ 已是最新，跳过")
-            ok += 1
-            continue
-        print(f"  [{name}] 同步:")
-        for d in diffs:
-            print(d)
-        if not args.yes:
-            ans = input("  确认写入? [y/N] ").strip().lower()
-            if ans != "y":
-                print(f"  [{name}] 跳过")
+        for inst_name, inst in ad.iter_instances():
+            tag = f"{name}@{inst_name}" if inst_name != "default" else name
+            try:
+                cur = inst.load_current()
+                tgt = inst.merge_with_current(target_ir)  # 应用策略（只增不删/全盘对齐）
+                diffs = inst.diff(cur, tgt)
+            except Exception as e:
+                print(f"  [{tag}] ⚠ 读取失败: {e}")
                 continue
-        try:
-            rendered = ad.render(tgt)
-            ad.write(rendered)
-            print(f"  [{name}] ✓ 已写入")
-            ok += 1
-        except Exception as e:
-            print(f"  [{name}] ✗ 写入失败: {e}", file=sys.stderr)
+            if not diffs:
+                print(f"  [{tag}] ✓ 已是最新，跳过")
+                ok += 1
+                continue
+            print(f"  [{tag}] 同步:")
+            for d in diffs:
+                print(d)
+            if not args.yes:
+                ans = input("  确认写入? [y/N] ").strip().lower()
+                if ans != "y":
+                    print(f"  [{tag}] 跳过")
+                    continue
+            try:
+                rendered = inst.render(tgt)
+                inst.write(rendered)
+                print(f"  [{tag}] ✓ 已写入")
+                ok += 1
+            except Exception as e:
+                print(f"  [{tag}] ✗ 写入失败: {e}", file=sys.stderr)
     print(f"完成: {ok} 个")
     return 0
 

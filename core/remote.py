@@ -31,15 +31,17 @@ class RemoteIO:
 
     @property
     def platform(self) -> str:
-        if self._platform is None:
-            try:
-                out = self._run(
-                    ["ssh", "-o", "BatchMode=yes", self.host, "uname -s"]
-                ).strip().lower()
-            except RuntimeError:
-                self._platform = "win"
-            else:
-                self._platform = "unix" if ("darwin" in out or "linux" in out) else "win"
+        """平台：构造时显式指定（配置记忆的权威）优先，否则自动 uname 检测。"""
+        if self._platform is not None:
+            return self._platform
+        try:
+            out = self._run(
+                ["ssh", "-o", "BatchMode=yes", self.host, "uname -s"]
+            ).strip().lower()
+        except RuntimeError:
+            self._platform = "win"
+        else:
+            self._platform = "unix" if ("darwin" in out or "linux" in out) else "win"
         return self._platform
 
     @property

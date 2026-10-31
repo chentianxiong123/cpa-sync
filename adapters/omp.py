@@ -29,12 +29,25 @@ class OmpAdapter(Adapter):
     name = "omp"
     label = "omp (oh-my-pi)"
 
-    def __init__(self, config=None, host: str | None = None, path: str | None = None):
+    def __init__(self, config=None, host: str | None = None, path: str | None = None, platform: str | None = None):
         super().__init__(config)
+        # 接入点：优先显式 host/path/platform，否则中央配置 adapter_instances，否则环境变量，否则 win11 默认
         self.host = host or os.environ.get("CPA_SYNC_OMP_HOST", DEFAULT_HOST)
-        # 路径可配置：win11 默认，mac 用 ~/.omp/agent/models.yml
         self.path = path or os.environ.get("CPA_SYNC_OMP_PATH", OMP_MODELS)
-        self.remote = RemoteIO(self.host)
+        self.platform = platform
+        self.remote = RemoteIO(self.host, platform=self.platform)
+
+    def iter_instances(self) -> list[tuple[str, "OmpAdapter"]]:
+        """中央配置 adapter_instances 里 omp 的接入点（每台机器一个）。
+        没配则回退单实例（显式 host/path 或默认 win11）。"""
+        instances = getattr(self.config, "adapter_instances", {}) or {}
+        omp_insts = instances.get("omp", []) if isinstance(instances, dict) else []
+        if omp_insts:
+            return [
+                (inst.name, OmpAdapter(self.config, host=inst.host, path=inst.path, platform=inst.platform))
+                for inst in omp_insts
+            ]
+        return [("default", self)]
 
     # ---- 读取当前配置 ----
     def load_current(self) -> ProviderIR | None:

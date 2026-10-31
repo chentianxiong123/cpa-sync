@@ -34,6 +34,24 @@ class CPASettings:
 
 
 @dataclass
+class HostDef:
+    """一台机器（可记忆：ssh 别名 + 系统类型）。"""
+
+    ssh: str
+    platform: str = "win"  # "win" | "unix"
+
+
+@dataclass
+class AdapterInstance:
+    """一个 adapter 接入点（某台机器上某个 app 的配置文件）。"""
+
+    name: str
+    host: str
+    path: str
+    platform: str | None = None  # None = 从 hosts 注册表查
+
+
+@dataclass
 class SyncConfig:
     """完整同步配置。"""
 
@@ -41,7 +59,15 @@ class SyncConfig:
     targets: list[str] = field(default_factory=list)  # 启用的 adapter 名
     # 模型同步策略: "merge"(只增不删, 默认安全) | "replace"(全盘对齐)
     strategy: str = "merge"
+    # 机器注册表（记忆哪些机器、什么系统）
+    hosts: dict[str, HostDef] = field(default_factory=dict)
+    # adapter 接入点（可配置可选择：每个 adapter 可接多台机器）
+    adapter_instances: dict[str, list[AdapterInstance]] = field(default_factory=dict)
     path: str = DEFAULT_CONFIG_PATH
+
+    def instance_for(self, adapter_name: str) -> list[AdapterInstance]:
+        """返回某 adapter 的接入点列表（配置里没配则空）。"""
+        return self.adapter_instances.get(adapter_name, []) or []
 
     @classmethod
     def load(cls, path: str | None = None) -> "SyncConfig":
@@ -51,6 +77,33 @@ class SyncConfig:
         with open(cfg_path, "r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
         cpa_raw = raw.get("cpa", {}) or {}
+        hosts_raw = raw.get("hosts", {}) or {}
+        hosts = {
+            k: HostDef(ssh=str(v.get("ssh", k)), platform=str(v.get("platform", "win")))
+            for k, v in hosts_raw.items()
+        } if isinstance(hosts_raw, dict) else {}
+        adapter_instances: dict[str, list[AdapterInstance]] = {}
+        for aname, insts in (raw.get("adapter_instances", {}) or {}).items():
+            if not isinstance(insts, list):
+                continue
+            items = []
+            for i in insts:
+                if not isinstance(i, dict):
+                    continue
+                h = str(i.get("host", ""))
+                # platform 优先取接入点显式值，否则从 hosts 注册表查
+                plat = i.get("platform")
+                if plat is None and h in hosts:
+                    plat = hosts[h].platform
+                items.append(
+                    AdapterInstance(
+                        name=str(i.get("name", h)),
+                        host=h,
+                        path=str(i.get("path", "")),
+                        platform=plat,
+                    )
+                )
+            adapter_instances[aname] = items
         return cls(
             cpa=CPASettings(
                 base_url=cpa_raw.get("base_url", "http://YOUR_CPA_IP:8317/v1"),
@@ -66,6 +119,8 @@ class SyncConfig:
             ),
             targets=list(raw.get("targets", []) or []),
             strategy=str(raw.get("strategy", "merge") or "merge"),
+            hosts=hosts,
+            adapter_instances=adapter_instances,
             path=cfg_path,
         )
 

@@ -41,6 +41,26 @@ cpa:
 # 当前固定 replace：每次同步都重新对齐 CPA 模型，不留旧模型。
 strategy: replace
 
+# ── 机器注册表（记忆哪些机器、什么系统）──
+# 每台接入的机器：ssh 别名 + 系统类型（win=Windows / unix=macOS·Linux）
+hosts:
+  win11:
+    ssh: win11
+    platform: win
+  macos:
+    ssh: macos
+    platform: unix
+
+# ── adapter 接入点（可配置可选择）──
+# 每个 adapter 可接多台机器；host 必须能在 hosts 里找到（或直接写 ssh 别名）
+# name 是接入点名（用于 CLI --host 选择 / GUI 勾选）
+adapter_instances:
+  omp:
+    - { name: win11, host: win11, path: "C:\\Users\\a1\\.omp\\agent\\models.yml" }
+    - { name: macos, host: macos, path: "/Users/a1/.omp/agent/models.yml" }
+  dsh:
+    - { name: win11, host: win11, path: "C:\\Users\\a1\\.dsh\\profiles\\web\\cordis.patch.yml" }
+
 # 要同步的下游应用（adapter 名）。空 = 全部已注册的 adapter。
 # 对应 adapters/ 下的模块：pi / opencode / claude / codex / omp / dsh
 targets:
