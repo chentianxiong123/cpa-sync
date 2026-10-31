@@ -1,16 +1,15 @@
 """跨主机文件读写辅助（经 ssh / scp）。
 
-本模块封装跨平台（Windows / macOS / Linux）的远程文件读写：
-  - read_remote(path, host)          : ssh type / cat
-  - write_remote(path, content, host): scp 上传临时文件 + ssh 原子替换（先备份）
-  - backup_remote(path, host)        : ssh 备份带时间戳
+- host=None：本机模式（直接读写本地文件，无 SSH）
+- host="win11" 等：远程模式（ssh/scp，自动检测 win/unix）
 
-平台自动检测：ssh 跑 `uname -s`，Darwin/Linux => unix，其余 => win。
-unix 用 sh 命令（cat/mv/cp），win 用 PowerShell（type/Move-Item/Copy-Item）。
+写文件统一走临时文件 + 原子替换（先备份）。失败不会清空原文件。
+本机模式用 os.replace 原子替换；远程用 scp 上传临时文件 + 远端原子替换。
 """
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import tempfile
 import time
@@ -18,20 +17,19 @@ import uuid
 
 
 class RemoteIO:
-    """通过 ssh/scp 访问远程主机文件的封装（自动检测 win/unix）。
+    """跨主机文件读写（本机 / 远程自动切换）。"""
 
-    写文件统一走 scp（原始字节传输，避免 ssh+PowerShell stdin 编码问题），
-    再在远端原子替换目标（先备份）。失败不会清空原文件。
-    """
-
-    def __init__(self, host: str, platform: str | None = None):
+    def __init__(self, host: str | None = None, platform: str | None = None):
         self.host = host
+        self.local = host is None  # 本机模式：不 SSH
         self._platform = platform  # None=自动检测; "win"|"unix"
         self._tmp_dir: str | None = None
 
     @property
     def platform(self) -> str:
-        """平台：构造时显式指定（配置记忆的权威）优先，否则自动 uname 检测。"""
+        """平台：本机模式按当前 OS；显式指定优先；否则自动 uname 检测。"""
+        if self.local:
+            return "win" if os.name == "nt" else "unix"
         if self._platform is not None:
             return self._platform
         try:
@@ -78,11 +76,16 @@ class RemoteIO:
 
     # ---- 读取 ----
     def read(self, path: str) -> str:
+        if self.local:
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
         if self.platform == "unix":
             return self._run(["ssh", "-o", "BatchMode=yes", self.host, f"cat \"{path}\""])
         return self._run(["ssh", "-o", "BatchMode=yes", self.host, f"type \"{path}\""])
 
     def exists(self, path: str) -> bool:
+        if self.local:
+            return os.path.exists(path)
         if self.platform == "unix":
             out = self._run(
                 ["ssh", "-o", "BatchMode=yes", self.host, f'[ -f "{path}" ] && echo YES || echo NO']
@@ -98,6 +101,10 @@ class RemoteIO:
         if not self.exists(path):
             return None
         stamp = time.strftime("%Y%m%d-%H%M%S")
+        if self.local:
+            dest = f"{path}.bak.{stamp}"
+            shutil.copy2(path, dest)
+            return dest
         if self.platform == "unix":
             backup_cmd = f'cp "{path}" "{path}.bak.{stamp}" && echo "{path}.bak.{stamp}"'
         else:
@@ -107,9 +114,11 @@ class RemoteIO:
             )
         return self._run(["ssh", "-o", "BatchMode=yes", self.host, backup_cmd]).strip()
 
-    # ---- 写入（scp 原子替换，最可靠）----
+    # ---- 写入（临时文件 + 原子替换，最可靠）----
     def write(self, path: str, content: str) -> None:
-        sep = "/" if self.platform == "unix" else "\\"
+        if self.local:
+            self._write_local(path, content)
+            return
         remote_tmp = f"{self.tmp_dir}/cpa_sync_{uuid.uuid4().hex[:8]}.tmp"
         remote_tmp_scp = remote_tmp  # scp 目标统一正斜杠
         local_tmp = os.path.join(tempfile.gettempdir(), f"cpa_sync_{uuid.uuid4().hex[:8]}.tmp")
@@ -143,5 +152,20 @@ class RemoteIO:
         finally:
             try:
                 os.remove(local_tmp)
+            except OSError:
+                pass
+
+    def _write_local(self, path: str, content: str) -> None:
+        """本机写：临时文件 + 原子替换（先备份）。"""
+        if os.path.exists(path):
+            shutil.copy2(path, f"{path}.bak.{time.strftime('%Y%m%d-%H%M%S')}")
+        tmp = f"{path}.cpa_tmp"
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(content)
+            os.replace(tmp, path)  # 原子替换
+        finally:
+            try:
+                os.remove(tmp)
             except OSError:
                 pass

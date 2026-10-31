@@ -31,14 +31,27 @@ class DshAdapter(Adapter):
     name = "dsh"
     label = "dsh (win11)"
 
-    def __init__(self, config=None, host: str | None = None):
+    def __init__(self, config=None, host: str | None = None, path: str | None = None, platform: str | None = None):
         super().__init__(config)
-        self.host = host or os.environ.get("CPA_SYNC_DSH_HOST", DEFAULT_HOST)
-        self.remote = RemoteIO(self.host)
+        # host=None = 本机模式（RemoteIO 直接读写本地文件，无 SSH）
+        self.host = host
+        if path is None:
+            if host is None:
+                # 本机默认：~/.dsh/...（发行物无需配路径）
+                path = os.path.expanduser("~/.dsh/profiles/web/cordis.patch.yml")
+                self.creds_path = os.path.expanduser("~/.dsh/.credentials.yaml")
+            else:
+                path = os.environ.get("CPA_SYNC_DSH_PATH", DSH_PROFILE)
+                self.creds_path = os.environ.get("CPA_SYNC_DSH_CREDENTIALS", DSH_CREDENTIALS)
+        else:
+            self.creds_path = os.environ.get("CPA_SYNC_DSH_CREDENTIALS", DSH_CREDENTIALS)
+        self.path = path
+        self.platform = platform
+        self.remote = RemoteIO(self.host, platform=self.platform)
 
     # ---- 读取当前配置 ----
     def load_current(self) -> ProviderIR | None:
-        raw = self.remote.read(DSH_PROFILE)
+        raw = self.remote.read(self.path)
         data = yaml.safe_load(raw)
         provider = self._find_cpa_provider(data)
         if provider is None:
@@ -56,7 +69,7 @@ class DshAdapter(Adapter):
     # ---- 渲染：IR -> cordis.patch.yml 的 providers.cpa ----
     def render(self, ir: ProviderIR) -> dict[str, Any]:
         """返回要写回 cordis.patch.yml 的完整 YAML（只改 cpa，保留其它）。"""
-        raw = self.remote.read(DSH_PROFILE)
+        raw = self.remote.read(self.path)
         data = yaml.safe_load(raw) or []
         entry = self._find_llm_pi_ai(data)
         if entry is None:

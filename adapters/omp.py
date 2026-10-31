@@ -31,9 +31,15 @@ class OmpAdapter(Adapter):
 
     def __init__(self, config=None, host: str | None = None, path: str | None = None, platform: str | None = None):
         super().__init__(config)
-        # 接入点：优先显式 host/path/platform，否则中央配置 adapter_instances，否则环境变量，否则 win11 默认
-        self.host = host or os.environ.get("CPA_SYNC_OMP_HOST", DEFAULT_HOST)
-        self.path = path or os.environ.get("CPA_SYNC_OMP_PATH", OMP_MODELS)
+        # host=None = 本机模式（RemoteIO 直接读写本地文件，无 SSH）
+        self.host = host
+        if path is None:
+            if host is None:
+                # 本机默认：~/.omp/agent/models.yml（发行物无需配路径）
+                path = os.path.expanduser("~/.omp/agent/models.yml")
+            else:
+                path = os.environ.get("CPA_SYNC_OMP_PATH", OMP_MODELS)
+        self.path = path
         self.platform = platform
         self.remote = RemoteIO(self.host, platform=self.platform)
 
