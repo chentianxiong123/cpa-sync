@@ -27,25 +27,27 @@ DEFAULT_HOST = "win11"
 
 class OmpAdapter(Adapter):
     name = "omp"
-    label = "omp (win11, oh-my-pi)"
+    label = "omp (oh-my-pi)"
 
-    def __init__(self, config=None, host: str | None = None):
+    def __init__(self, config=None, host: str | None = None, path: str | None = None):
         super().__init__(config)
         self.host = host or os.environ.get("CPA_SYNC_OMP_HOST", DEFAULT_HOST)
+        # 路径可配置：win11 默认，mac 用 ~/.omp/agent/models.yml
+        self.path = path or os.environ.get("CPA_SYNC_OMP_PATH", OMP_MODELS)
         self.remote = RemoteIO(self.host)
 
     # ---- 读取当前配置 ----
     def load_current(self) -> ProviderIR | None:
-        raw = self.remote.read(OMP_MODELS)
+        raw = self.remote.read(self.path)
         data = yaml.safe_load(raw) or {}
-        provider = data.get("providers", {}).get("cpa")
+        provider = self._find_cpa_provider(data)
         if not isinstance(provider, dict):
             return None
         return self._provider_to_ir(provider)
 
     # ---- 渲染：IR -> models.yml 的 providers.cpa ----
     def render(self, ir: ProviderIR) -> dict[str, Any]:
-        raw = self.remote.read(OMP_MODELS)
+        raw = self.remote.read(self.path)
         data = yaml.safe_load(raw) or {}
         data.setdefault("providers", {})
         providers = data["providers"]
@@ -76,15 +78,18 @@ class OmpAdapter(Adapter):
     # ---- 写入（含远程备份）----
     def write(self, rendered: Any, *, backup: bool = False) -> None:
         text = yaml.safe_dump(rendered, sort_keys=False, allow_unicode=True)
-        self.remote.write(OMP_MODELS, text)
+        self.remote.write(self.path, text)
 
     # ---- 内部辅助 ----
     @staticmethod
     def _find_cpa_provider_key(data: dict) -> str | None:
-        """固定 provider key 为 cpa（若已存在则返回 cpa，否则 None）。"""
+        """找代表 CPA 的 provider key：优先 key=cpa，否则任意 name=cpa 的 key。"""
         providers = data.get("providers", {}) or {}
         if isinstance(providers.get("cpa"), dict):
             return "cpa"
+        for k, v in providers.items():
+            if isinstance(v, dict) and v.get("name") == "cpa":
+                return k
         return None
 
     @classmethod
