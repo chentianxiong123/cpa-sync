@@ -1,17 +1,22 @@
-# cpa-sync 中央配置 —— 模板（脱敏，供参考/发行）
+# cpa-sync / agent-sync 配置 —— 模板（脱敏，供参考/发行）
 #
-# 真实配置放 config/cpa-config.yaml（已 .gitignore，不进仓库）。
+# 同一份 config 结构：
+#   - cpa-sync（中心）：中心机 config/cpa-config.yaml（已 .gitignore，不进仓库）
+#   - agent-sync（客户端）：拷到目标机后填 base_url + api_key
 # 用法：cp config/cpa-config.example.yaml config/cpa-config.yaml
 #       然后填你的 base_url / api_key。
 #
-# 你在这里填写 CPA 的 IP / 密钥 / 模型白名单，cpa-sync apply 一键分发到所有下游。
-# 修改后运行: cpa-sync apply   或   cpa-sync check（只看不改）
+# 中心机：cpa-sync apply 一键分发到所有下游；
+# 目标机：agent-sync apply 本机自拉（只需 base_url + api_key + targets）。
 
 cpa:
   # CPA (cli-proxy-api) 网关地址 —— 替换成你的
   base_url: "http://YOUR_CPA_IP:8317/v1"
   # CPA 的 API key —— 替换成你的
   api_key: "YOUR_CPA_API_KEY"
+  # 供应商标识：下游（pi/opencode 等）用它作 provider 的 key。
+  # 有意义且稳定（默认 "cpa"），不要用随机 UUID；历史 UUID 会自动迁移。
+  provider_id: "cpa"
 
   # 模型：留空 = 动态扫 CPA 的 /v1/models，扫出什么就配什么（用户期望）
   # 若只想配部分模型，才在这里列白名单（支持带前缀 sensenova/deepseek-v4-flash）

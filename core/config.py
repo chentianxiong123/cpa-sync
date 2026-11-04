@@ -22,6 +22,9 @@ class CPASettings:
 
     base_url: str = "http://YOUR_CPA_IP:8317/v1"
     api_key: str = "YOUR_CPA_API_KEY"
+    # 供应商标识：下游（pi/opencode 等）用它作 provider 的 key（如 "cpa"）。
+    # 有意义且稳定，不要用随机 UUID。历史遗留的 UUID key 会在 apply 时自动迁移。
+    provider_id: str = "cpa"
     include_models: list[str] = field(default_factory=list)  # 空 = 全部
     exclude_models: list[str] = field(default_factory=list)  # 支持通配符
     # 全局上下文窗口（默认 500K，所有下游统一）
@@ -108,6 +111,7 @@ class SyncConfig:
             cpa=CPASettings(
                 base_url=cpa_raw.get("base_url", "http://YOUR_CPA_IP:8317/v1"),
                 api_key=str(cpa_raw.get("api_key", "YOUR_CPA_API_KEY")),
+                provider_id=str(cpa_raw.get("provider_id", "cpa") or "cpa"),
                 include_models=list(cpa_raw.get("include_models", []) or []),
                 exclude_models=list(cpa_raw.get("exclude_models", []) or []),
                 context_window=int(cpa_raw.get("context_window", 512000) or 512000),
@@ -184,6 +188,7 @@ def build_provider_ir(cfg: SyncConfig, cpa_models: list[ModelIR]) -> ProviderIR:
             )
         )
     return ProviderIR(
+        provider_id=cfg.cpa.provider_id,
         base_url=cfg.cpa.base_url,
         api_key=cfg.cpa.api_key,
         models=final,

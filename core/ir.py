@@ -37,6 +37,9 @@ class ProviderIR:
     """一个上游 provider（通常是 CPA 网关）在 IR 中的表示。"""
 
     name: str = "cpa"
+    # 供应商标识：下游（pi/opencode 等）用它在 models.json 里作 provider 的 key。
+    # 应是有意义且稳定的字符串（如 "cpa"），不要用随机 UUID。
+    provider_id: str = "cpa"
     base_url: str = ""
     api_key: str = ""
     api: str = "openai-completions"
