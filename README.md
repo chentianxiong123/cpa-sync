@@ -1,22 +1,26 @@
-# cpa-sync —— CPA 配置一键同步
+# cpa-sync —— CPA 配置同步
 
-把 `meilan-phone1` 上的 **CPA (cli-proxy-api)** 配置，一键同步到所有下游 agent 应用。
+把 **CPA (cli-proxy-api)** 配置同步到所有 agent 应用。两套工具：
 
-**一句话**：中央配置文件是唯一事实来源，改一处，`cpa-sync sync` 一键下发到 6 个下游系统，全部指向 CPA，模型 / 上下文统一。
+- **`cpa-sync`（中心模式）**：在中心机跑，中央配置为唯一事实来源，一键下发到各接入机（ssh/scp）。
+- **`agent-sync`（客户端模式）**：拷到目标机跑，**无 SSH**，目标机自己连 CPA 拉模型、写本机 agent 文件。
+
+**一句话**：中央配置 = 唯一事实来源；中心机用 `cpa-sync` 下发，各目标机也可用 `agent-sync` 自拉。
 
 ## 架构
 
 ```
-config/cpa-config.yaml  (唯一事实来源)
+             ┌─ cpa-sync sync ─┬─ pi.py       → 本机 ~/.pi/agent/models.json
+             │                  ├─ opencode.py → 本机 ~/.config/opencode/opencode.json
+             │                  ├─ claude.py   → cc-switch providers (app_type=claude)
+             │                  ├─ codex.py    → cc-switch providers (app_type=codex)
+config/cpa-config.yaml        ├─ omp.py      → 各机 ~/.omp/agent/models.yml (多主机)
+(唯一事实来源)                 └─ dsh.py      → 各机 ~/.dsh/profiles/web/cordis.patch.yml
         │
-        ├─ 校验: GET /v1/models (CPA 能力检查，动态扫模型)
-        │
-        └─ cpa-sync sync ─┬─ pi.py       → 本机 ~/.pi/agent/models.json
-                           ├─ opencode.py → 本机 ~/.config/opencode/opencode.json
-                           ├─ claude.py   → cc-switch providers (app_type=claude)
-                           ├─ codex.py    → cc-switch providers (app_type=codex)
-                           ├─ omp.py      → win11 ~/.omp/agent/models.yml (ssh)
-                           └─ dsh.py      → win11 ~/.dsh/profiles/web/cordis.patch.yml (ssh)
+        └─ 校验: GET /v1/models (CPA 能力检查，动态扫模型)
+
+agent-sync (目标机自拉，无 SSH):
+  目标机 config/cpa-config.yaml → 连 CPA 扫模型 → 写本机 agent 文件
 ```
 
 ## 已实现 adapter（6 个）
@@ -27,8 +31,8 @@ config/cpa-config.yaml  (唯一事实来源)
 | `opencode` | 本机 `~/.config/opencode/opencode.json` | provider `cpa`，19 模型 |
 | `claude` | cc-switch `providers` 表 (claude) | **每条模型一条 provider**，notes=cpa，meta=openai_chat |
 | `codex` | cc-switch `providers` 表 (codex) | 每条模型一条 provider，notes=cpa，wire_api=responses |
-| `omp` | win11 `~/.omp/agent/models.yml` | ssh，provider `cpa` |
-| `dsh` | win11 `~/.dsh/profiles/web/cordis.patch.yml` | ssh，provider `cpa` |
+| `omp` | 各机 `~/.omp/agent/models.yml`（多主机，见 adapter_instances） | 收拢到 providers.cpa |
+| `dsh` | 各机 `~/.dsh/profiles/web/cordis.patch.yml`（多主机） | provider `cpa` |
 
 **claude/codex 风格**（用户明确）：同一供应商（CPA）下，**每个模型单独一条 provider**，全部指向 CPA，
 `name=模型名`、`notes=cpa`，像以前"小水管"那样。claude 用根路径 base_url（claude 自己拼 `/v1/messages`），
@@ -75,14 +79,27 @@ strategy: replace            # replace = 全盘对齐，不留旧模型
 - **写文件安全**：scp 上传临时文件 → 远端原子替换，失败不会清空原文件
 - **cc-switch 切换式**：claude/codex 走"推翻再来"（每次全盘重建 provider 集合，不做增量 diff）
 
+## 两套工具分工
+
+| | `cpa-sync`（中心） | `agent-sync`（客户端） |
+|---|---|---|
+| 跑在哪 | 中心机 | 目标机 |
+| 连接 | SSH 进目标机 | 无 SSH |
+| 配置 | 中央配置 + 记忆各机 | 本机 base_url + api_key |
+| 适用 | 中心统一管理 | 发行 / 自部署 |
+
+> 两者共用同一套 `adapters/` 渲染逻辑，只是运行位置不同。详见 `AGENT-SYNC.md`。
+
 ## 目录
 
 ```
 cpa-sync/
-├── cpa-sync              # CLI 入口
+├── cpa-sync              # CLI 入口（中心模式）
+├── agent-sync            # CLI 入口（客户端模式，无 SSH）
+├── agent-sync.sh/.ps1    # 客户端启动器（macOS/Linux / Windows）
 ├── core/                 # ir / cpa_client / config / remote
 ├── adapters/             # base + pi/opencode/claude/codex/omp/dsh
-├── config/cpa-config.yaml# 中央配置
+├── config/cpa-config.yaml# 中央配置（中心模式）
 └── tests/                # 单元测试
 ```
 

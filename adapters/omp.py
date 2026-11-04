@@ -1,14 +1,19 @@
-"""omp (oh-my-pi, win11) 适配器 —— 同步 CPA provider 配置到 models.yml。
+"""omp (oh-my-pi) 适配器 —— 同步 CPA provider 配置到 models.yml。
 
-omp 的模型/provider 配置在 win11 上：
-  C:\\Users\\a1\\.omp\\agent\\models.yml
-其中 providers.sensenova 是 CPA 网关（name: cpa），providers.iamhc 是备份。
+omp 的模型/provider 配置在每台接入机上：
+  - 本机: ~/.omp/agent/models.yml
+  - win11: C:\\Users\\a1\\.omp\\agent\\models.yml
+  - 其他: 由 adapter_instances 指定 host/path
+
+providers 下统一收拢到 key=cpa（代表 CPA 网关）：
+  - 清掉任何“代表 CPA 但 key 不是 cpa”的旧条目（如旧的 sensenova）
+  - 只保留一个 providers.cpa（baseUrl/apiKey/models）
+  - 其它 provider（如 iamhc）保留不动，由使用方自行清理
 
 本适配器：
-  - 只更新 providers.sensenova（CPA）的 baseUrl / apiKey / models
-  - 保留 providers.iamhc 及其它顶层字段
+  - 只更新 providers.cpa（CPA）的 baseUrl / apiKey / models
   - omp 的 apiKey 直接内联（不像 dsh 走 env），直接覆盖
-  - 通过 ssh/scp 读写 win11，写入前远程备份
+  - 经 RemoteIO 读写（本机直读写 / 远程走 ssh），写入前自动备份 + 原子替换
 """
 from __future__ import annotations
 
