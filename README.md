@@ -37,7 +37,7 @@ agent-sync (目标机自拉，无 SSH):
 | `codex` | cc-switch `providers` 表 (codex) | 每条模型一条 provider，notes=cpa，wire_api=responses |
 | `omp` | 各机 `~/.omp/agent/models.yml`（多主机，见 adapter_instances） | 收拢到 providers.cpa；屏蔽自带 provider 用 `scripts/omp_disable_providers.py`（写 config.yml 的 disabledProviders） |
 | `dsh` | 各机 `~/.dsh/profiles/web/cordis.patch.yml`（多主机） | provider `cpa` |
-| `picoclaw` | meilan-phone1 `~/.picoclaw/config.json`（多主机） | model_list 里 provider=cpa（api_keys 数组） |
+| `picoclaw` | meilan-phone1 `~/.picoclaw/config.json`（多主机） | model_list 里 provider=cpa（api_keys 数组）；砍自带模型用 `scripts/picoclaw_disable_builtin.py`（删 model_list 非 cpa 条目） |
 | `crush` | meilan-phone1 `~/.config/crush/crushrc`（crushrc 配置层，多主机） | `provider add cpa --type openai-compat` + `model add`（19 模型）；`option default-providers false` 屏蔽自带（Catwalk）模型 |
 | `openclaw` | win11 `~/.openclaw/openclaw.json`（多主机） | models.providers.cpa |
 | `hermes` | win11 `.../hermes/config.yaml`（多主机） | providers.cpa + model 主端点 |
