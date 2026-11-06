@@ -26,7 +26,8 @@ targets:
 |---|---|
 | laptop | `pi` `opencode` `claude` `codex` |
 | macos | `omp` |
-| win11 | `omp` `dsh` |
+| win11 | `omp` `dsh` `openclaw` `hermes` |
+| meilan-phone1 | `picoclaw` `crush` |
 
 ## 用法（在目标机上）
 
@@ -52,6 +53,10 @@ Windows：`python -m venv .venv; .venv\Scripts\pip install pyyaml`
 - `claude`/`codex`：本机 cc-switch（`~/.cc-switch/cc-switch.db`）
 - `omp`：本机 `~/.omp/agent/models.yml`
 - `dsh`：本机 `~/.dsh/profiles/web/cordis.patch.yml`
+- `picoclaw`：meilan-phone1 `~/.picoclaw/config.json`
+- `crush`：meilan-phone1 `~/.local/share/crush/providers.json`
+- `openclaw`：win11 `~/.openclaw/openclaw.json`
+- `hermes`：win11 `%LOCALAPPDATA%\hermes\config.yaml`
 
 ## 和 cpa-sync（中心模式）的区别
 

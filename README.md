@@ -15,7 +15,11 @@
              │                  ├─ claude.py   → cc-switch providers (app_type=claude)
              │                  ├─ codex.py    → cc-switch providers (app_type=codex)
 config/cpa-config.yaml        ├─ omp.py      → 各机 ~/.omp/agent/models.yml (多主机)
-(唯一事实来源)                 └─ dsh.py      → 各机 ~/.dsh/profiles/web/cordis.patch.yml
+(唯一事实来源)                 ├─ dsh.py      → 各机 ~/.dsh/profiles/web/cordis.patch.yml
+                             ├─ picoclaw.py → meilan-phone1 ~/.picoclaw/config.json (多主机)
+                             ├─ crush.py    → meilan-phone1 ~/.local/share/crush/providers.json (多主机)
+                             ├─ openclaw.py → win11 ~/.openclaw/openclaw.json (多主机)
+                             └─ hermes.py   → win11 .../hermes/config.yaml (多主机)
         │
         └─ 校验: GET /v1/models (CPA 能力检查，动态扫模型)
 
@@ -23,7 +27,7 @@ agent-sync (目标机自拉，无 SSH):
   目标机 config/cpa-config.yaml → 连 CPA 扫模型 → 写本机 agent 文件
 ```
 
-## 已实现 adapter（6 个）
+## 已实现 adapter（10 个）
 
 | adapter | 位置 | 说明 |
 |---------|------|------|
@@ -33,6 +37,10 @@ agent-sync (目标机自拉，无 SSH):
 | `codex` | cc-switch `providers` 表 (codex) | 每条模型一条 provider，notes=cpa，wire_api=responses |
 | `omp` | 各机 `~/.omp/agent/models.yml`（多主机，见 adapter_instances） | 收拢到 providers.cpa |
 | `dsh` | 各机 `~/.dsh/profiles/web/cordis.patch.yml`（多主机） | provider `cpa` |
+| `picoclaw` | meilan-phone1 `~/.picoclaw/config.json`（多主机） | model_list 里 provider=cpa（api_keys 数组） |
+| `crush` | meilan-phone1 `~/.local/share/crush/providers.json`（多主机） | id=cpa，type=openai-compat |
+| `openclaw` | win11 `~/.openclaw/openclaw.json`（多主机） | models.providers.cpa |
+| `hermes` | win11 `.../hermes/config.yaml`（多主机） | providers.cpa + model 主端点 |
 
 **claude/codex 风格**（用户明确）：同一供应商（CPA）下，**每个模型单独一条 provider**，全部指向 CPA，
 `name=模型名`、`notes=cpa`，像以前"小水管"那样。claude 用根路径 base_url（claude 自己拼 `/v1/messages`），
@@ -98,7 +106,7 @@ cpa-sync/
 ├── agent-sync            # CLI 入口（客户端模式，无 SSH）
 ├── agent-sync.sh/.ps1    # 客户端启动器（macOS/Linux / Windows）
 ├── core/                 # ir / cpa_client / config / remote
-├── adapters/             # base + pi/opencode/claude/codex/omp/dsh
+├── adapters/             # base + pi/opencode/claude/codex/omp/dsh/picoclaw/crush/openclaw/hermes
 ├── config/cpa-config.yaml# 中央配置（中心模式）
 └── tests/                # 单元测试
 ```
