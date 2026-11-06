@@ -17,7 +17,7 @@
 config/cpa-config.yaml        ├─ omp.py      → 各机 ~/.omp/agent/models.yml (多主机)
 (唯一事实来源)                 ├─ dsh.py      → 各机 ~/.dsh/profiles/web/cordis.patch.yml
                              ├─ picoclaw.py → meilan-phone1 ~/.picoclaw/config.json (多主机)
-                             ├─ crush.py    → meilan-phone1 ~/.local/share/crush/providers.json (多主机)
+                             ├─ crush.py    → meilan-phone1 ~/.config/crush/crushrc (crushrc 配置层，多主机)
                              ├─ openclaw.py → win11 ~/.openclaw/openclaw.json (多主机)
                              └─ hermes.py   → win11 .../hermes/config.yaml (多主机)
         │
@@ -38,7 +38,7 @@ agent-sync (目标机自拉，无 SSH):
 | `omp` | 各机 `~/.omp/agent/models.yml`（多主机，见 adapter_instances） | 收拢到 providers.cpa |
 | `dsh` | 各机 `~/.dsh/profiles/web/cordis.patch.yml`（多主机） | provider `cpa` |
 | `picoclaw` | meilan-phone1 `~/.picoclaw/config.json`（多主机） | model_list 里 provider=cpa（api_keys 数组） |
-| `crush` | meilan-phone1 `~/.local/share/crush/providers.json`（多主机） | id=cpa，type=openai-compat |
+| `crush` | meilan-phone1 `~/.config/crush/crushrc`（crushrc 配置层，多主机） | `provider add cpa --type openai-compat` + `model add`（19 模型）；`option default-providers false` 屏蔽自带（Catwalk）模型 |
 | `openclaw` | win11 `~/.openclaw/openclaw.json`（多主机） | models.providers.cpa |
 | `hermes` | win11 `.../hermes/config.yaml`（多主机） | providers.cpa + model 主端点 |
 
