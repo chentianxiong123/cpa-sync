@@ -35,7 +35,7 @@ agent-sync (目标机自拉，无 SSH):
 | `opencode` | 本机 `~/.config/opencode/opencode.json` | provider `cpa`，19 模型 |
 | `claude` | cc-switch `providers` 表 (claude) | **每条模型一条 provider**，notes=cpa，meta=openai_chat |
 | `codex` | cc-switch `providers` 表 (codex) | 每条模型一条 provider，notes=cpa，wire_api=responses |
-| `omp` | 各机 `~/.omp/agent/models.yml`（多主机，见 adapter_instances） | 收拢到 providers.cpa |
+| `omp` | 各机 `~/.omp/agent/models.yml`（多主机，见 adapter_instances） | 收拢到 providers.cpa；屏蔽自带 provider 用 `scripts/omp_disable_providers.py`（写 config.yml 的 disabledProviders） |
 | `dsh` | 各机 `~/.dsh/profiles/web/cordis.patch.yml`（多主机） | provider `cpa` |
 | `picoclaw` | meilan-phone1 `~/.picoclaw/config.json`（多主机） | model_list 里 provider=cpa（api_keys 数组） |
 | `crush` | meilan-phone1 `~/.config/crush/crushrc`（crushrc 配置层，多主机） | `provider add cpa --type openai-compat` + `model add`（19 模型）；`option default-providers false` 屏蔽自带（Catwalk）模型 |
@@ -107,6 +107,8 @@ cpa-sync/
 ├── agent-sync.sh/.ps1    # 客户端启动器（macOS/Linux / Windows）
 ├── core/                 # ir / cpa_client / config / remote
 ├── adapters/             # base + pi/opencode/claude/codex/omp/dsh/picoclaw/crush/openclaw/hermes
+├── scripts/              # 一次性/辅助脚本（如 omp_disable_providers.py 屏蔽 omp 自带 provider）
+├── docs/                 # 研究/设计笔记（如 omp 屏蔽自带 provider 机制）
 ├── config/cpa-config.yaml# 中央配置（中心模式）
 └── tests/                # 单元测试
 ```
