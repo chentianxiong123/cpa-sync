@@ -49,7 +49,7 @@ codex 用带 `/v1` 的 base_url（OpenAI 格式）+ `wire_api=responses`。
 ## 用法
 
 ```bash
-cd /mnt/shared/cpa-sync
+cd /mnt/shared/my-project/cpa-sync
 ./cpa-sync models                  # CPA 暴露的全部模型
 ./cpa-sync list                    # 各 adapter 当前状态
 ./cpa-sync check [adapter...]      # dry-run：只对比不写

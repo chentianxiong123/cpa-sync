@@ -7,12 +7,17 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import yaml
 
+# 默认配置路径：基于项目根目录自动推导（core/ 的上一级），不写死绝对路径。
+# 这样项目拷到任何位置（中心机/目标机/发行目录）都能直接用。
+# 仍可用环境变量 CPA_SYNC_CONFIG 覆盖。
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH = os.environ.get(
-    "CPA_SYNC_CONFIG", "/mnt/shared/cpa-sync/config/cpa-config.yaml"
+    "CPA_SYNC_CONFIG", str(_PROJECT_ROOT / "config" / "cpa-config.yaml")
 )
 
 
