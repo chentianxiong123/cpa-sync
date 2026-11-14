@@ -105,15 +105,28 @@ class HermesAdapter(Adapter):
                 return v
         return None
 
-    @staticmethod
-    def _provider_to_ir(provider: dict) -> ProviderIR:
+    def _provider_to_ir(self, provider: dict) -> ProviderIR:
         from core.ir import ModelIR
 
+        # hermes 应用动态探测 context window（不读 config 里 models 的该字段）；
+        # 因此当前值以中央配置为准（模型条目里若显式写了则优先），使 diff 收敛。
+        cfg = self.config
+        cpa_cfg = getattr(cfg, "cpa", None)
+        cw = getattr(cpa_cfg, "context_window", None) or 128000
+        mt = getattr(cpa_cfg, "max_tokens", None) or 16384
         models = []
         raw_models = provider.get("models", {}) or {}
         if isinstance(raw_models, dict):
-            for mid in raw_models:
-                models.append(ModelIR(id=mid, context_window=128000, max_tokens=16384, input_modes=["text"]))
+            for mid, mval in raw_models.items():
+                mval = mval if isinstance(mval, dict) else {}
+                models.append(
+                    ModelIR(
+                        id=mid,
+                        context_window=int(mval.get("contextWindow", cw)),
+                        max_tokens=int(mval.get("maxTokens", mt)),
+                        input_modes=["text"],
+                    )
+                )
         return ProviderIR(
             base_url=str(provider.get("base_url", "")),
             api_key=str(provider.get("api_key", "")),
