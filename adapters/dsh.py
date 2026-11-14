@@ -61,7 +61,7 @@ class DshAdapter(Adapter):
     def _current_api_key(self) -> str:
         """读 credentials 里的 DSH_CPA_API_KEY（dsh 的密钥存这里）。"""
         try:
-            creds = yaml.safe_load(self.remote.read(DSH_CREDENTIALS)) or {}
+            creds = yaml.safe_load(self.remote.read(self.creds_path)) or {}
             return str(creds.get("refs", {}).get("DSH_CPA_API_KEY", ""))
         except Exception:
             return ""
@@ -97,13 +97,13 @@ class DshAdapter(Adapter):
     # ---- 写入（含远程备份）----
     def write(self, rendered: Any, *, backup: bool = False) -> None:
         text = yaml.safe_dump(rendered, sort_keys=False, allow_unicode=True)
-        self.remote.write(DSH_PROFILE, text)  # remote.write 内部自动备份+原子替换
+        self.remote.write(self.path, text)  # remote.write 内部自动备份+原子替换
         # 若 api_key 变化，同步到 .credentials.yaml 的 DSH_CPA_API_KEY
         self._sync_api_key_if_needed()
 
     def _sync_api_key_if_needed(self) -> None:
         try:
-            creds_raw = self.remote.read(DSH_CREDENTIALS)
+            creds_raw = self.remote.read(self.creds_path)
         except Exception:
             return
         creds = yaml.safe_load(creds_raw) or {}
@@ -113,7 +113,7 @@ class DshAdapter(Adapter):
         # 更新 refs
         refs["DSH_CPA_API_KEY"] = self._target_api_key()
         creds["refs"] = refs
-        self.remote.write(DSH_CREDENTIALS, yaml.safe_dump(creds, sort_keys=False, allow_unicode=True))
+        self.remote.write(self.creds_path, yaml.safe_dump(creds, sort_keys=False, allow_unicode=True))
 
     # ---- 内部辅助 ----
     def _target_api_key(self) -> str:
