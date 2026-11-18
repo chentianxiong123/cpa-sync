@@ -49,6 +49,18 @@ class DshAdapter(Adapter):
         self.platform = platform
         self.remote = RemoteIO(self.host, platform=self.platform)
 
+    def iter_instances(self) -> list[tuple[str, "DshAdapter"]]:
+        """中央配置 adapter_instances 里 dsh 的接入点（每台机器一个）。
+        没配则回退单实例（显式 host/path 或默认 win11）。"""
+        instances = getattr(self.config, "adapter_instances", {}) or {}
+        dsh_insts = instances.get("dsh", []) if isinstance(instances, dict) else []
+        if dsh_insts:
+            return [
+                (inst.name, DshAdapter(self.config, host=inst.host, path=inst.path, platform=inst.platform))
+                for inst in dsh_insts
+            ]
+        return [("default", self)]
+
     # ---- 读取当前配置 ----
     def load_current(self) -> ProviderIR | None:
         raw = self.remote.read(self.path)
@@ -88,6 +100,7 @@ class DshAdapter(Adapter):
                 "id": m.id,
                 "contextWindow": m.context_window,
                 "maxTokens": m.max_tokens,
+                "input": m.input_modes,
             }
             for m in ir.models
         ]
@@ -142,12 +155,16 @@ class DshAdapter(Adapter):
         from core.ir import ModelIR
 
         models = []
+        # dsh 模态解析顺序：条目 input → catalog → 路由 defaultInput（默认 [text]）。
+        # 我们读不到 catalog（自定义网关），所以回退到路由级 defaultInput。
+        route_default = provider.get("defaultInput") or ["text"]
         for m in provider.get("models", []) or []:
             models.append(
                 ModelIR(
                     id=m.get("id", ""),
                     context_window=m.get("contextWindow", 128000),
                     max_tokens=m.get("maxTokens", 16384),
+                    input_modes=list(m.get("input") or route_default or ["text"]),
                 )
             )
         return ProviderIR(
