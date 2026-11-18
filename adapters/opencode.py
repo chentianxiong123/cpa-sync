@@ -54,14 +54,36 @@ class OpencodeAdapter(Adapter):
         cpa["models"] = {
             m.id: {
                 "name": m.id,
-                "contextWindow": m.context_window,
-                "maxTokens": m.max_tokens,
-                "input": m.input_modes,
-                "reasoning": m.reasoning,
+                "capabilities": {
+                    "tools": True,
+                    "input": m.input_modes,
+                    "output": ["text"],
+                    "reasoning": {"supported": m.reasoning},
+                },
+                "limit": {
+                    "context": m.context_window,
+                    "output": m.max_tokens,
+                },
             }
             for m in ir.models
         }
         return data
+
+    def diff(self, current, target) -> list[str]:
+        lines = super().diff(current, target)
+        # 检测旧 schema（顶层 input/contextWindow/maxTokens）→ 需要迁移到 capabilities/limit。
+        # IR 值相同时 base.diff 不会报差异，这里显式触发一次重写完成迁移。
+        data = self._read()
+        cpa = self._find_cpa(data)
+        if isinstance(cpa, dict):
+            ms = cpa.get("models", {})
+            if isinstance(ms, dict):
+                sample = next((v for v in ms.values() if isinstance(v, dict)), {})
+                if "input" in sample or "contextWindow" in sample or "maxTokens" in sample:
+                    lines.append(
+                        f"  [{self.name}] schema 迁移: 顶层 input/contextWindow/maxTokens -> capabilities/limit"
+                    )
+        return lines
 
     # ---- 写入（含备份）----
     def write(self, rendered: Any, *, backup: bool = False) -> None:
@@ -98,13 +120,30 @@ class OpencodeAdapter(Adapter):
         for mid, m in (provider.get("models", {}) or {}).items():
             if not isinstance(m, dict):
                 m = {}
+            caps = m.get("capabilities", {}) or {}
+            limit = m.get("limit", {}) or {}
+            # 官方 v2：capabilities.input / capabilities.reasoning / limit.context / limit.output
+            # 兼容旧 schema：顶层 input / contextWindow / maxTokens / reasoning
+            input_modes = caps.get("input")
+            if input_modes is None:
+                input_modes = m.get("input", ["text"])
+            reasoning = bool(m.get("reasoning", False))
+            r = caps.get("reasoning")
+            if isinstance(r, dict):
+                reasoning = bool(r.get("supported", False))
+            ctx = limit.get("context")
+            if ctx is None:
+                ctx = m.get("contextWindow", 128000)
+            out = limit.get("output")
+            if out is None:
+                out = m.get("maxTokens", 16384)
             models.append(
                 ModelIR(
                     id=mid,
-                    context_window=int(m.get("contextWindow", 128000) or 128000),
-                    max_tokens=int(m.get("maxTokens", 16384) or 16384),
-                    input_modes=list(m.get("input", ["text"]) or ["text"]),
-                    reasoning=bool(m.get("reasoning", False)),
+                    context_window=int(ctx or 128000),
+                    max_tokens=int(out or 16384),
+                    input_modes=list(input_modes or ["text"]),
+                    reasoning=reasoning,
                 )
             )
         return ProviderIR(
