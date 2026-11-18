@@ -37,8 +37,14 @@ class CPASettings:
     max_tokens: int = 16384
     # codex 的自动压缩阈值（model_auto_compact_token_limit），中央统一控制
     auto_compact_token_limit: int = 300000
-    # 每个模型可选的覆盖（contextWindow/maxTokens 等）
+    # 每个模型可选的覆盖（contextWindow/maxTokens/input/reasoning 等）
     model_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # 全局默认 input 模式（无覆盖、无识图匹配时的兜底）。如 ["text"] 或 ["text", "image"]。
+    default_input_modes: list[str] = field(default_factory=lambda: ["text"])
+    # 识图模型匹配：模型名通配符（fnmatch），命中则 input 加 "image"（叠加到 default_input_modes 上）。
+    # 例：["*"] 全开；["sensenova-*", "gemini-*"] 部分开。
+    # 单个模型想排除/收紧，用 model_overrides 显式写 input（优先级最高）。
+    image_models: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -125,6 +131,8 @@ class SyncConfig:
                     cpa_raw.get("auto_compact_token_limit", 300000) or 300000
                 ),
                 model_overrides=dict(cpa_raw.get("model_overrides", {}) or {}),
+                default_input_modes=list(cpa_raw.get("default_input_modes", ["text"]) or ["text"]),
+                image_models=list(cpa_raw.get("image_models", []) or []),
             ),
             targets=list(raw.get("targets", []) or []),
             strategy=str(raw.get("strategy", "merge") or "merge"),
@@ -174,6 +182,25 @@ def filter_models(
     return [m for m in models if not excluded(m.id)]
 
 
+def resolve_input_modes(mid: str, ov: dict[str, Any], cfg: SyncConfig) -> list[str]:
+    """决定一个模型最终的 input 模式（识图能力）。
+
+    优先级：
+      1. model_overrides[id].input 显式给出 → 完全尊重（可开可关）
+      2. 否则 base = default_input_modes；若 image_models 通配符命中 → base 加 "image"
+    """
+    import fnmatch
+
+    if "input" in ov:
+        return list(ov["input"] or ["text"])
+    base = list(cfg.cpa.default_input_modes or ["text"])
+    if "image" not in base and any(
+        fnmatch.fnmatch(mid, pat) for pat in (cfg.cpa.image_models or [])
+    ):
+        base = base + ["image"]
+    return base
+
+
 def build_provider_ir(cfg: SyncConfig, cpa_models: list[ModelIR]) -> ProviderIR:
     """由中央配置 + CPA 能力构建最终要分发的 ProviderIR。"""
     from .ir import ModelIR, ProviderIR
@@ -187,7 +214,7 @@ def build_provider_ir(cfg: SyncConfig, cpa_models: list[ModelIR]) -> ProviderIR:
                 id=m.id,
                 context_window=ov.get("contextWindow", cfg.cpa.context_window),
                 max_tokens=ov.get("maxTokens", cfg.cpa.max_tokens),
-                input_modes=ov.get("input", ["text"]),
+                input_modes=resolve_input_modes(m.id, ov, cfg),
                 reasoning=ov.get("reasoning", False),
                 extra=m.extra,
             )

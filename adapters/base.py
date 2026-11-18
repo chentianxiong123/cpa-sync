@@ -118,6 +118,10 @@ class Adapter(abc.ABC):
                     lines.append(f"  [{self.name}] 模型 {mid}: contextWindow {cm.context_window} -> {tm.context_window}")
                 if cm.max_tokens != tm.max_tokens:
                     lines.append(f"  [{self.name}] 模型 {mid}: maxTokens {cm.max_tokens} -> {tm.max_tokens}")
+                if cm.input_modes != tm.input_modes:
+                    lines.append(
+                        f"  [{self.name}] 模型 {mid}: input {cm.input_modes} -> {tm.input_modes}"
+                    )
         return lines
 
     def check(self, target: ProviderIR) -> list[str]:

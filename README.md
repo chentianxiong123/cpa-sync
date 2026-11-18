@@ -73,10 +73,21 @@ cpa:
   context_window: 512000    # 所有下游统一（pi/opencode/dsh/omp 的 contextWindow + codex 的 model_context_window）
   max_tokens: 16384
   auto_compact_token_limit: 300000   # codex 的 model_auto_compact_token_limit
+  default_input_modes: ["text"]     # 全局默认 input 模式（无覆盖/未命中时的兜底）
+  image_models: ["*"]               # 识图模型匹配（fnmatch 通配符），命中则 input 加 "image"
 strategy: replace            # replace = 全盘对齐，不留旧模型
 ```
 
 **统一管理**：`context_window` / `auto_compact_token_limit` 由中央配置控制，改一处 → `cpa-sync sync` → 所有 agent 统一。
+
+**识图能力匹配**：三个层级，优先级从低到高：
+
+1. `default_input_modes`：全局兜底（默认 `["text"]`）
+2. `image_models`：模型名通配符（fnmatch），命中则叠加 `image`；`["*"]` = 全部模型识图
+3. `model_overrides.<model>.input`：单模型显式声明，**最高优先级**（可全开后单独关掉不识图的模型）
+
+适配 omp / pi / opencode / omp 等写 `input` 字段的 adapter。声明 `image` 只代表 agent 允许发图，
+不代表上游模型一定支持视觉（CPA 的 `/v1/models` 不带能力字段，只能靠这里声明）。
 
 ## 关键设计
 

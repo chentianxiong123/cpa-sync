@@ -33,6 +33,16 @@ cpa:
   # 与 context_window 一起由中央配置统一控制，改这里即全改（codex 专属）
   auto_compact_token_limit: 200000
 
+  # ---- 识图能力匹配（omp / pi / opencode / omp 等写 input 字段的 adapter 生效）----
+  # 全局默认 input 模式：无 model_overrides 且未命中 image_models 时的兜底。
+  # 可选值：["text"]（纯文本）/ ["text", "image"]（默认识图）
+  default_input_modes: ["text"]
+  # 识图模型匹配：模型名通配符（fnmatch），命中则 input 加 "image"（叠加到 default_input_modes）。
+  # ["*"] = 全部模型识图；["sensenova-*", "gemini-*"] = 仅这些前缀。
+  # 想排除单个模型：在 model_overrides 里显式写 input: ["text"]（优先级最高）。
+  # 注意：声明 image 只代表 agent 允许发图，不代表上游模型一定支持视觉，请按需收窄。
+  image_models: ["*"]
+
   # 每个模型的覆盖字段（可选）：contextWindow / maxTokens / input / reasoning
   # 模型级覆盖优先于全局 context_window。
   model_overrides:

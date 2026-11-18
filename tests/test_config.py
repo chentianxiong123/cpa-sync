@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 import sys
 sys.path.insert(0, str(ROOT))
 
-from core.config import SyncConfig, filter_models
+from core.config import SyncConfig, filter_models, resolve_input_modes
 from core.ir import ModelIR, ProviderIR
 
 
@@ -46,6 +46,73 @@ class TestFilterModels(unittest.TestCase):
     def test_exclude_wildcard(self):
         out = filter_models(self.models, [], ["*-flash*"])
         self.assertEqual([m.id for m in out], ["glm-5.3", "qwen3.8-27b"])
+
+
+class TestInputModes(unittest.TestCase):
+    """识图能力匹配：default_input_modes + image_models 通配符 + model_overrides 优先级。"""
+
+    def _write(self, yaml_text: str) -> str:
+        fd, path = tempfile.mkstemp(suffix=".yaml")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(yaml_text)
+        return path
+
+    def _cfg(self, yaml_text: str):
+        path = self._write(yaml_text)
+        self.addCleanup(os.unlink, path)
+        return SyncConfig.load(path)
+
+    def test_default_text_only(self):
+        # 无 image_models、无覆盖 → 兜底 default_input_modes
+        cfg = self._cfg("cpa:\n  default_input_modes: [\"text\"]\n")
+        self.assertEqual(resolve_input_modes("glm-5.3", {}, cfg), ["text"])
+
+    def test_image_models_wildcard_match(self):
+        # image_models 通配符命中 → 叠加 image
+        cfg = self._cfg("cpa:\n  image_models: [\"sensenova-*\"]\n")
+        self.assertEqual(
+            resolve_input_modes("sensenova-6.8-flash-lite", {}, cfg), ["text", "image"]
+        )
+
+    def test_image_models_no_match(self):
+        cfg = self._cfg("cpa:\n  image_models: [\"gemini-*\"]\n")
+        self.assertEqual(resolve_input_modes("sensenova-6.8-flash-lite", {}, cfg), ["text"])
+
+    def test_image_models_star_all(self):
+        # ["*"] = 全部模型识图
+        cfg = self._cfg("cpa:\n  image_models: [\"*\"]\n")
+        self.assertEqual(resolve_input_modes("ernie-5.5-flash-preview", {}, cfg), ["text", "image"])
+
+    def test_override_beats_image_models(self):
+        # model_overrides 显式写 input → 最高优先级（即使 image_models 全开也能单关）
+        cfg = self._cfg("cpa:\n  image_models: [\"*\"]\n")
+        ov = {"input": ["text"]}
+        self.assertEqual(resolve_input_modes("deepseek-v4-flash", ov, cfg), ["text"])
+        ov_on = {"input": ["text", "image"]}
+        self.assertEqual(
+            resolve_input_modes("deepseek-v4-flash", ov_on, cfg), ["text", "image"]
+        )
+
+    def test_build_provider_ir_applies_matching(self):
+        # 集成：image_models ["*"] 下所有模型都带 image；单模型可被覆盖关掉
+        from core.config import build_provider_ir
+        cfg = self._cfg(
+            "cpa:\n"
+            "  image_models: [\"*\"]\n"
+            "  model_overrides:\n"
+            "    deepseek-v4-flash:\n"
+            "      input: [\"text\"]\n"
+        )
+        models = [ModelIR(id="deepseek-v4-flash"), ModelIR(id="sensenova-6.8-flash-lite")]
+        ir = build_provider_ir(cfg, models)
+        by_id = {m.id: m.input_modes for m in ir.models}
+        self.assertEqual(by_id["sensenova-6.8-flash-lite"], ["text", "image"])
+        self.assertEqual(by_id["deepseek-v4-flash"], ["text"])
+
+    def test_default_input_modes_from_yaml(self):
+        # default_input_modes 也可全局直设为识图（等价全开，无需 image_models）
+        cfg = self._cfg("cpa:\n  default_input_modes: [\"text\", \"image\"]\n")
+        self.assertEqual(resolve_input_modes("glm-5.3", {}, cfg), ["text", "image"])
 
 
 class TestSyncConfig(unittest.TestCase):
