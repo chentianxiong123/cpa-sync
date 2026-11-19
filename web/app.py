@@ -142,7 +142,7 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> int:
     p = argparse.ArgumentParser(description="cpa-sync Web 控制面板")
     p.add_argument("--host", default="127.0.0.1")
-    p.add_argument("--port", type=int, default=8080)
+    p.add_argument("--port", type=int, default=17834)
     a = p.parse_args()
     print(f"cpa-sync Web 控制面板 → http://{a.host}:{a.port}")
     ThreadingHTTPServer((a.host, a.port), Handler).serve_forever()
