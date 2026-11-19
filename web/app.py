@@ -36,7 +36,6 @@ except ImportError:  # pragma: no cover
     yaml = None
 
 CONFIG_PATH = str(ROOT / "config" / "cpa-config.yaml")
-INDEX_PATH = Path(__file__).parent / "static" / "index.html"
 VENV_PY = str(ROOT / ".venv" / "bin" / "python")
 
 # 中心 / 客户端 命令集合
@@ -171,8 +170,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         p = self.path.split("?")[0]
         if p == "/":
-            html = INDEX_PATH.read_bytes() if INDEX_PATH.exists() else "<h1>index.html 缺失</h1>".encode("utf-8")
-            return self._send(200, html, "text/html; charset=utf-8")
+            # API-only：静态页面由 nginx 直接提供（web/nginx.conf）
+            return self._json({"ok": True, "service": "cpa-sync api", "note": "静态由 nginx 提供"})
         if p == "/api/config":
             try:
                 with open(CONFIG_PATH, encoding="utf-8") as f:
@@ -231,7 +230,7 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> int:
     p = argparse.ArgumentParser(description="cpa-sync Web 控制面板")
     p.add_argument("--host", default="127.0.0.1")
-    p.add_argument("--port", type=int, default=17834)
+    p.add_argument("--port", type=int, default=17835)
     a = p.parse_args()
     print(f"cpa-sync Web 控制面板 → http://{a.host}:{a.port}")
     ThreadingHTTPServer((a.host, a.port), Handler).serve_forever()

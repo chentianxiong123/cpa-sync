@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# cpa-sync 自带 nginx：把 web/nginx.conf 安装到系统 nginx 并 reload。
+# 用法: cpa-sync-nginx [install|remove]
+# install —— 生成实际配置(替换 __PROJECT_ROOT__) → /etc/nginx/conf.d/cpa-sync.conf → reload
+# remove  —— 卸载配置 → reload
+set -e
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+DEST=/etc/nginx/conf.d/cpa-sync.conf
+
+case "${1:-install}" in
+  install)
+    sed "s|__PROJECT_ROOT__|$ROOT|g" "$ROOT/web/nginx.conf" > /tmp/cpa-nginx.conf
+    sudo cp /tmp/cpa-nginx.conf "$DEST"
+    sudo nginx -t
+    sudo nginx -s reload
+    echo "✓ nginx 已安装并重载（网关 8380 + Web 17834）"
+    ;;
+  remove)
+    sudo rm -f "$DEST"
+    sudo nginx -s reload
+    echo "✓ 已移除 cpa-sync.conf"
+    ;;
+  *)
+    echo "用法: $0 [install|remove]"; exit 1;;
+esac
