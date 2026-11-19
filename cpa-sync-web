@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# cpa-sync Web 控制面板启动器 —— 用 venv 的 python 跑 web/app.py
+set -e
+cd "$(dirname "$0")"
+if [ ! -x ".venv/bin/python" ]; then
+    echo "✗ 未找到 .venv，先建环境: python3 -m venv .venv && .venv/bin/pip install PyYAML" >&2
+    exit 1
+fi
+exec .venv/bin/python web/app.py "$@"

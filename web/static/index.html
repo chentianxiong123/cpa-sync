@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cpa-sync · 控制面板</title>
+<style>
+  :root {
+    --bg:#f4f5f7; --card:#ffffff; --line:#e6e8eb; --text:#1f2937; --muted:#6b7280;
+    --accent:#2563eb; --accent-soft:#eff4ff; --ok:#16a34a; --warn:#d97706; --err:#dc2626;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --radius:12px; --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:20px}
+
+  header{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px}
+  header .logo{width:34px;height:34px;border-radius:9px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px}
+  header h1{font-size:17px;margin:0;font-weight:650}
+  header .sub{font-size:12px;color:var(--muted)}
+  header .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);margin-left:auto;box-shadow:0 0 0 4px rgba(22,163,74,.15)}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .card .head{padding:12px 16px;border-bottom:1px solid var(--line);font-weight:650;font-size:13px;color:var(--text);display:flex;align-items:center;gap:8px}
+  .card .head .tag{margin-left:auto;font-size:11px;color:var(--muted);font-weight:500}
+  .card .body{padding:16px}
+
+  label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px}
+  input[type=text],input[type=password],input[type=number],select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;color:var(--text)}
+  input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .hint{font-size:11px;color:var(--muted);margin-top:4px}
+
+  .checks{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;font-size:12px;cursor:pointer;user-select:none;transition:all .15s}
+  .chip input{display:none}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .chip.on::before{content:"✓";font-size:11px}
+
+  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+  button{padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--text);font-size:13px;cursor:pointer;transition:all .15s}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary:hover{background:#1d4ed8}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+  button.ghost:hover{color:var(--err)}
+
+  .log{background:#111827;border-radius:10px;padding:12px;font-family:var(--mono);font-size:12px;line-height:1.55;color:#d1d5db;min-height:280px;max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+  .log .t{color:#6b7280}
+  .log .ok{color:#4ade80}.log .err{color:#f87171}
+
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600}
+  td:first-child{font-family:var(--mono);font-weight:600}
+  .statusbar{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12px;color:var(--muted)}
+  .statusbar .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+  .statusbar.busy .dot{background:var(--warn)}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none}
+  .toast.show{opacity:.95}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">◆</div>
+    <div>
+      <h1>cpa-sync 控制面板</h1>
+      <div class="sub">CPA 配置一键同步 · 集群网关</div>
+    </div>
+    <div class="dot" id="dot" title="服务在线"></div>
+  </header>
+
+  <div class="grid">
+    <!-- 左：配置 -->
+    <div class="card">
+      <div class="head">配置<span class="tag" id="cfg-path"></span></div>
+      <div class="body">
+        <label>CPA Base URL</label>
+        <input type="text" id="base_url" placeholder="http://192.168.31.213:8317/v1">
+        <label>API Key</label>
+        <input type="password" id="api_key" placeholder="123456">
+
+        <div class="row3">
+          <div><label>上下文窗口</label><input type="number" id="context_window" step="1024"></div>
+          <div><label>最大输出</label><input type="number" id="max_tokens" step="1024"></div>
+          <div><label>自动压缩阈值</label><input type="number" id="auto_compact" step="1024"></div>
+        </div>
+
+        <label>模型白名单（逗号分隔，空=动态扫 CPA）</label>
+        <input type="text" id="include_models" placeholder="如 sensenova-6.8-flash-lite, kimi-k3.1-pro">
+        <div class="hint">支持通配符 *.flash</div>
+        <label>模型黑名单（逗号分隔）</label>
+        <input type="text" id="exclude_models" placeholder="如 *.preview">
+
+        <label>同步策略</label>
+        <select id="strategy">
+          <option value="replace">replace — 全盘对齐 CPA 模型（清幽灵）</option>
+          <option value="merge">merge — 只增不删（保留下游额外模型）</option>
+        </select>
+
+        <label>同步目标</label>
+        <div class="checks" id="targets"></div>
+      </div>
+    </div>
+
+    <!-- 右：操作 + 日志 -->
+    <div>
+      <div class="card">
+        <div class="head">操作</div>
+        <div class="body">
+          <div class="btns">
+            <button id="b-models">📡 扫描模型</button>
+            <button id="b-list">📋 当前状态</button>
+            <button id="b-check">🔍 检查（干跑）</button>
+            <button id="b-apply" class="primary">🚀 同步</button>
+            <button id="b-doctor">🩺 诊断</button>
+            <button id="b-save">💾 保存配置</button>
+            <button id="b-reload" class="ghost">↺</button>
+          </div>
+          <div class="log" id="log"><span class="t">— 就绪。点击上方按钮执行；保存配置后点「检查」确认差异，再「同步」。</span></div>
+          <div class="statusbar" id="statusbar"><div class="dot"></div><span id="status-text">空闲</span></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="head">Agent 接入点</div>
+        <div class="body">
+          <table><thead><tr><th style="width:90px">agent</th><th>配置文件</th></tr></thead><tbody id="adapter-table"></tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const ADAPTERS = ["pi","opencode","claude","codex","dsh","omp"];
+const CMD_BTNS = { "b-models":"models", "b-list":"list", "b-check":"check", "b-apply":"apply", "b-doctor":"doctor" };
+
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
+function setBusy(b){ $("statusbar").classList.toggle("busy",b); $("status-text").textContent = b?"执行中…":"空闲"; }
+
+async function api(path, body){
+  const opts = body!==undefined ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : {};
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+// 日志
+function log(text, cls){
+  const el=$("log");
+  const span=document.createElement("div");
+  if(cls) span.className=cls;
+  span.textContent=text;
+  el.appendChild(span);
+  el.scrollTop=el.scrollHeight;
+}
+function clearLog(){ $("log").innerHTML=""; }
+
+// 配置
+function buildTargets(sel){
+  const box=$("targets"); box.innerHTML="";
+  ADAPTERS.forEach(a=>{
+    const label=document.createElement("label");
+    label.className="chip"+(sel.includes(a)?" on":"");
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.value=a; cb.checked=sel.includes(a);
+    cb.addEventListener("change",()=>label.classList.toggle("on",cb.checked));
+    label.appendChild(cb); label.appendChild(document.createTextNode(a));
+    box.appendChild(label);
+  });
+}
+function readForm(){
+  const cpa={};
+  cpa.base_url=$("base_url").value.trim();
+  cpa.api_key=$("api_key").value.trim();
+  cpa.context_window=parseInt($("context_window").value)||256000;
+  cpa.max_tokens=parseInt($("max_tokens").value)||16384;
+  cpa.auto_compact_token_limit=parseInt($("auto_compact").value)||200000;
+  cpa.include_models=$("include_models").value.split(",").map(s=>s.trim()).filter(Boolean);
+  cpa.exclude_models=$("exclude_models").value.split(",").map(s=>s.trim()).filter(Boolean);
+  const targets=[...document.querySelectorAll("#targets input:checked")].map(i=>i.value);
+  return {cpa, strategy:$("strategy").value, targets};
+}
+function fillForm(cfg){
+  const cpa=cfg.cpa||{};
+  $("base_url").value=cpa.base_url||"";
+  $("api_key").value=cpa.api_key||"";
+  $("context_window").value=cpa.context_window||256000;
+  $("max_tokens").value=cpa.max_tokens||16384;
+  $("auto_compact").value=cpa.auto_compact_token_limit||200000;
+  $("include_models").value=(cpa.include_models||[]).join(", ");
+  $("exclude_models").value=(cpa.exclude_models||[]).join(", ");
+  $("strategy").value=cfg.strategy||"replace";
+  buildTargets(cfg.targets||[]);
+}
+
+// 命令
+async function runCmd(cmd){
+  setBusy(true);
+  const r=await api("/api/run",{cmd});
+  setBusy(false);
+  const cls=r.code===0?"":"err";
+  log(r.output||"(无输出)", cls);
+  return r;
+}
+
+async function loadConfig(){
+  try{
+    const r=await api("/api/config");
+    if(r.ok){ fillForm(r.config); log("✓ 配置已加载","ok"); }
+    else log("✗ 加载配置失败: "+r.error,"err");
+  }catch(e){ log("✗ 加载配置失败: "+e,"err"); }
+}
+async function saveConfig(){
+  setBusy(true);
+  const r=await api("/api/config",{config:readForm()});
+  setBusy(false);
+  if(r.ok){ log("✓ 配置已保存","ok"); toast("配置已保存"); }
+  else { log("✗ 保存失败: "+(r.error||""),"err"); }
+}
+async function loadAdapters(){
+  const r=await api("/api/adapter-paths");
+  if(!r.ok) return;
+  $("adapter-table").innerHTML = r.adapters.map(a=>`<tr><td>${a.agent}</td><td>${a.path}</td></tr>`).join("");
+}
+
+// 事件
+Object.entries(CMD_BTNS).forEach(([id,cmd])=>{
+  $(id).addEventListener("click",()=>runCmd(cmd));
+});
+$("b-save").addEventListener("click",saveConfig);
+$("b-reload").addEventListener("click",async()=>{ clearLog(); await loadConfig(); });
+
+// 初始化
+$("cfg-path").textContent="config/cpa-config.yaml";
+loadConfig(); loadAdapters();
+</script>
+</body>
+</html>
