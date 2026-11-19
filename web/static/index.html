@@ -13,35 +13,31 @@
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
-  .app{display:flex;min-height:100vh}
 
-  /* ---- 侧边导航 ---- */
-  .side{width:168px;background:var(--card);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
-  .side .logo{display:flex;align-items:center;gap:9px;padding:6px 8px 16px;font-weight:700;font-size:15px}
-  .side .logo .ic{width:28px;height:28px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px}
-  .nav{display:flex;flex-direction:column;gap:3px}
-  .nav button{display:flex;align-items:center;gap:9px;padding:9px 10px;border:none;background:none;border-radius:8px;font-size:13px;color:var(--muted);cursor:pointer;text-align:left;transition:all .14s}
-  .nav button:hover{background:var(--bg);color:var(--text)}
-  .nav button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
-  .side .ver{margin-top:auto;padding:10px 8px;font-size:11px;color:var(--muted);border-top:1px solid var(--line)}
-  .side .ver b{color:var(--text)}
+  /* ---- 顶部：品牌 + 模式切换 + 全局动作 ---- */
+  header{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:16px;padding:10px 22px;box-shadow:var(--shadow)}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;white-space:nowrap}
+  .brand .ic{width:28px;height:28px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px}
+  .modes{display:flex;gap:6px;background:var(--bg);padding:4px;border-radius:10px}
+  .modebtn{border:none;background:none;padding:7px 14px;border-radius:7px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
+  .modebtn.on{background:var(--card);color:var(--accent);font-weight:600;box-shadow:var(--shadow)}
+  .spacer{flex:1}
+  .hd-act{display:flex;align-items:center;gap:8px}
+  .ver{font-size:12px;color:var(--muted)}
+  .ver b{color:var(--text)}
 
-  /* ---- 主区 ---- */
-  .main{flex:1;padding:18px 22px;max-width:1080px}
-  .topbar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
-  .topbar h1{font-size:18px;margin:0;font-weight:650}
-  .topbar .sub{font-size:12px;color:var(--muted)}
-  .topbar .spacer{flex:1}
-  .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px rgba(22,163,74,.14)}
-
-  /* ---- 卡片/折叠 ---- */
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden}
-  details.card summary{cursor:pointer;padding:12px 16px;font-weight:650;font-size:13px;list-style:none;display:flex;align-items:center;gap:8px}
-  details.card summary::-webkit-details-marker{display:none}
-  details.card summary::before{content:"▸";color:var(--muted);font-size:11px;transition:transform .15s}
-  details.card[open] summary::before{transform:rotate(90deg)}
-  details.card summary .cnt{margin-left:auto;font-size:11px;color:var(--muted);font-weight:500}
-  .card .body{padding:14px 16px;border-top:1px solid var(--line)}
+  /* ---- 主区：功能卡片流（自上而下） ---- */
+  main{max-width:1000px;margin:0 auto;padding:18px 22px 40px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+  .ch{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--line);
+    font-weight:650;font-size:14px;background:linear-gradient(180deg,#fafbfc,#fff)}
+  .ch .n{width:26px;height:26px;border-radius:7px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+  .ch .sub{font-size:12px;color:var(--muted);font-weight:400}
+  .ch .spacer{flex:1}
+  .ch .cnt{font-size:11px;color:var(--muted);font-weight:500}
+  .body{padding:16px 18px}
+  .hide{display:none}
 
   /* ---- 表单 ---- */
   label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px}
@@ -49,7 +45,6 @@
   textarea{font-family:var(--mono);font-size:12px;resize:vertical;min-height:70px}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
   .hint{font-size:11px;color:var(--muted);margin-top:4px}
 
   .checks{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
@@ -68,7 +63,7 @@
   button:disabled{opacity:.5;cursor:not-allowed}
 
   /* ---- 日志 ---- */
-  .log{background:#111827;border-radius:10px;padding:12px;font-family:var(--mono);font-size:12px;line-height:1.55;color:#d1d5db;min-height:160px;max-height:340px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+  .log{background:#111827;border-radius:10px;padding:12px;font-family:var(--mono);font-size:12px;line-height:1.55;color:#d1d5db;min-height:120px;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:break-word}
   .log .ok{color:#4ade80}.log .err{color:#f87171}.log .t{color:#6b7280}
   .statusbar{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--muted)}
   .statusbar .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
@@ -87,198 +82,153 @@
 
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
   .toast.show{opacity:.95}
-  .hide{display:none}
 </style>
 </head>
 <body>
-<div class="app">
-  <!-- 侧边导航 -->
-  <aside class="side">
-    <div class="logo"><div class="ic">◆</div>cpa-sync</div>
-    <nav class="nav">
-      <button data-tab="config" class="on">⚙️ 配置</button>
-      <button data-tab="machine">🖥️ 机器</button>
-      <button data-tab="sync">🔁 同步</button>
-      <button data-tab="diag">🩺 诊断</button>
-      <button data-tab="system">🧰 系统</button>
-    </nav>
-    <div class="ver">cpa-sync <b id="ver">…</b><br><span id="ver-adapters"></span></div>
-  </aside>
+<header>
+  <div class="brand"><div class="ic">◆</div>cpa-sync 控制面板</div>
+  <div class="modes">
+    <button class="modebtn on" data-mode="central" onclick="setMode('central')">🖥️ 中心模式 · SSH 下发</button>
+    <button class="modebtn" data-mode="client" onclick="setMode('client')">📱 客户端模式 · 本机自拉</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="hd-act">
+    <button onclick="saveConfig()">💾 保存配置</button>
+    <button onclick="reloadConfig()">↺ 重读</button>
+    <span class="ver">v<b id="ver">…</b> · <span id="ver-adapters"></span></span>
+  </div>
+</header>
 
-  <!-- 主区 -->
-  <main class="main">
-    <div class="topbar">
-      <div>
-        <h1 id="tab-title">配置</h1>
-        <div class="sub" id="cfg-path">config/cpa-config.yaml</div>
+<main>
+  <!-- ① CPA 网关 -->
+  <section class="card">
+    <div class="ch"><span class="n">①</span>CPA 网关 <span class="sub">配置来源 · 连接哪台网关</span></div>
+    <div class="body"><div class="row">
+      <div><label>Base URL</label><input type="text" id="base_url" placeholder="http://192.168.31.213:8317/v1"></div>
+      <div><label>API Key</label><input type="password" id="api_key" placeholder="123456"></div>
+    </div></div>
+  </section>
+
+  <!-- ② 模型策略 -->
+  <section class="card">
+    <div class="ch"><span class="n">②</span>模型策略 <span class="sub">选哪些模型 · 统一上下文 · 同步策略</span></div>
+    <div class="body">
+      <div class="row">
+        <div><label>上下文窗口</label><input type="number" id="context_window" step="1024"></div>
+        <div><label>最大输出</label><input type="number" id="max_tokens" step="1024"></div>
       </div>
-      <div class="spacer"></div>
-      <div class="dot" title="在线"></div>
+      <label>codex 自动压缩阈值</label><input type="number" id="auto_compact" step="1024">
+      <div class="row">
+        <div><label>模型白名单（逗号分隔，空=动态扫）</label><input type="text" id="include_models" placeholder="留空 = 扫 CPA 全部"><div class="hint">支持通配符 *.flash</div></div>
+        <div><label>模型黑名单（逗号分隔）</label><input type="text" id="exclude_models" placeholder="如 *.preview"></div>
+      </div>
+      <label>同步策略</label>
+      <select id="strategy">
+        <option value="replace">replace — 全盘对齐 CPA（清幽灵）</option>
+        <option value="merge">merge — 只增不删（保留下游额外模型）</option>
+      </select>
     </div>
+  </section>
 
-    <!-- ① 配置 -->
-    <section id="tab-config">
-      <details class="card" open>
-        <summary>CPA 连接</summary>
-        <div class="body"><div class="row">
-          <div><label>Base URL</label><input type="text" id="base_url" placeholder="http://192.168.31.213:8317/v1"></div>
-          <div><label>API Key</label><input type="password" id="api_key" placeholder="123456"></div>
-        </div></div>
-      </details>
-
-      <details class="card" open>
-        <summary>模型与上下文</summary>
-        <div class="body">
-          <div class="row">
-            <div><label>上下文窗口</label><input type="number" id="context_window" step="1024"></div>
-            <div><label>最大输出</label><input type="number" id="max_tokens" step="1024"></div>
-          </div>
-          <label>codex 自动压缩阈值</label><input type="number" id="auto_compact" step="1024">
-          <div class="row">
-            <div><label>模型白名单（逗号分隔，空=动态扫）</label><input type="text" id="include_models" placeholder="留空 = 扫 CPA 全部"><div class="hint">支持通配符 *.flash</div></div>
-            <div><label>模型黑名单（逗号分隔）</label><input type="text" id="exclude_models" placeholder="如 *.preview"></div>
-          </div>
-          <label>同步策略</label>
-          <select id="strategy">
-            <option value="replace">replace — 全盘对齐 CPA（清幽灵）</option>
-            <option value="merge">merge — 只增不删（保留下游额外模型）</option>
-          </select>
-        </div>
-      </details>
-
-      <details class="card">
-        <summary>识图能力（三层优先级）</summary>
-        <div class="body">
-          <div class="row">
-            <div><label>① default_input_modes（全局兜底）</label>
-              <select id="default_input_modes">
-                <option value="text">text（纯文本）</option>
-                <option value="text,image">text,image（默认识图）</option>
-              </select></div>
-            <div><label>② image_models（通配符，命中叠加 image；逗号分隔）</label>
-              <input type="text" id="image_models" placeholder="如 * 或 sensenova-*, gemini-*"></div>
-          </div>
-          <label>③ model_overrides（模型级覆盖，最高优先级）</label>
-          <table><thead><tr><th>模型名</th><th style="width:150px">input</th><th style="width:100px">reasoning</th><th style="width:110px">context</th><th style="width:110px">max_tokens</th><th style="width:36px"></th></tr></thead>
-          <tbody id="ov-tbody"></tbody></table>
-          <button class="addrow" onclick="addOverride()">＋ 添加模型覆盖</button>
-          <div class="hint">模型名 → {input, reasoning, context_window, max_tokens}，优先级高于全局</div>
-        </div>
-      </details>
-    </section>
-
-    <!-- ② 机器 -->
-    <section id="tab-machine" class="hide">
-      <details class="card" open>
-        <summary>主机注册表 hosts<span class="cnt" id="hosts-cnt"></span></summary>
-        <div class="body">
-          <table><thead><tr><th style="width:120px">ssh 别名</th><th style="width:110px">平台</th><th style="width:36px"></th></tr></thead>
-          <tbody id="hosts-tbody"></tbody></table>
-          <button class="addrow" onclick="addHost()">＋ 添加主机</button>
-        </div>
-      </details>
-
-      <details class="card" open>
-        <summary>Adapter 多主机实例 adapter_instances</summary>
-        <div class="body" id="ai-wrap"></div>
-      </details>
-
-      <details class="card" open>
-        <summary>同步目标 targets<span class="cnt" id="targets-cnt"></span></summary>
-        <div class="body">
-          <div class="checks" id="targets"></div>
-        </div>
-      </details>
-    </section>
-
-    <!-- ③ 同步 -->
-    <section id="tab-sync" class="hide">
-      <div class="card">
-        <div class="body">
-          <div class="hint" style="margin-top:0">中心模式（cpa-sync · 在中心机 SSH 下发各机）</div>
-          <div class="btns">
-            <button onclick="runCmd('central','check')">🔍 检查（干跑）</button>
-            <button class="primary" onclick="runCmd('central','apply')">🚀 同步</button>
-            <button onclick="runCmd('central','models')">📡 扫描模型</button>
-            <button onclick="runCmd('central','list')">📋 状态</button>
-          </div>
-          <div class="hint" style="margin-top:14px">客户端模式（agent-sync · 本机无 SSH 自拉）</div>
-          <div class="btns">
-            <button onclick="runCmd('client','check')">🔍 检查（干跑）</button>
-            <button class="primary" onclick="runCmd('client','apply')">🚀 同步</button>
-            <button onclick="runCmd('client','list')">📋 状态</button>
-            <button onclick="runCmd('client','doctor')">🩺 诊断</button>
-          </div>
-          <div class="log" id="log"><span class="t">— 选择模式执行。先「检查」看 diff，再「同步」。</span></div>
-          <div class="statusbar" id="statusbar"><div class="dot"></div><span id="status-text">空闲</span></div>
-        </div>
+  <!-- ③ 识图能力 -->
+  <section class="card">
+    <div class="ch"><span class="n">③</span>识图能力 <span class="sub">三层优先级 · 自上而下</span></div>
+    <div class="body">
+      <div class="row">
+        <div><label>① default_input_modes（全局兜底）</label>
+          <select id="default_input_modes">
+            <option value="text">text（纯文本）</option>
+            <option value="text,image">text,image（默认识图）</option>
+          </select></div>
+        <div><label>② image_models（通配符，命中叠加 image；逗号分隔）</label>
+          <input type="text" id="image_models" placeholder="如 * 或 sensenova-*, gemini-*"></div>
       </div>
-    </section>
+      <label>③ model_overrides（模型级覆盖，最高优先级）</label>
+      <table><thead><tr><th>模型名</th><th style="width:150px">input</th><th style="width:100px">reasoning</th><th style="width:110px">context</th><th style="width:110px">max_tokens</th><th style="width:36px"></th></tr></thead>
+      <tbody id="ov-tbody"></tbody></table>
+      <button class="addrow" onclick="addOverride()">＋ 添加模型覆盖</button>
+      <div class="hint">模型名 → {input, reasoning, context_window, max_tokens}，优先级高于全局</div>
+    </div>
+  </section>
 
-    <!-- ④ 诊断 -->
-    <section id="tab-diag" class="hide">
-      <div class="card">
-        <div class="body">
-          <div class="btns">
-            <button class="primary" onclick="runCmd('central','doctor')">🩺 诊断</button>
-            <button onclick="runCmd('central','list')">📋 各 adapter 现状</button>
-            <button onclick="runCmd('central','models')">📡 CPA 模型</button>
-          </div>
-          <div class="log" id="log-diag"><span class="t">— 诊断输出。</span></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="body"><div class="hint" style="margin-top:0">Agent 接入点（动态发现）</div>
-          <table><thead><tr><th style="width:110px">adapter</th><th>说明</th></tr></thead><tbody id="adapter-table"></tbody></table>
-        </div>
-      </div>
-    </section>
+  <!-- ④ 机器拓扑 -->
+  <section class="card" id="card-topo">
+    <div class="ch"><span class="n">④</span>机器拓扑 <span class="sub">改到哪 · 仅中心模式（SSH 下发需要）</span></div>
+    <div class="body">
+      <label>主机注册表 hosts</label>
+      <table><thead><tr><th style="width:120px">ssh 别名</th><th style="width:110px">平台</th><th style="width:36px"></th></tr></thead>
+      <tbody id="hosts-tbody"></tbody></table>
+      <button class="addrow" onclick="addHost()">＋ 添加主机</button>
+      <label style="margin-top:16px">Adapter 多主机实例 adapter_instances</label>
+      <div id="ai-wrap"></div>
+      <label style="margin-top:16px">同步目标 targets</label>
+      <div class="checks" id="targets"></div>
+      <div class="hint">targets 空=全部 adapter</div>
+    </div>
+  </section>
 
-    <!-- ⑤ 系统 -->
-    <section id="tab-system" class="hide">
-      <div class="card">
-        <div class="body"><div class="hint" style="margin-top:0">一次性维护脚本（屏蔽下游自带 provider / 模型）</div>
-          <div id="scripts-wrap"></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="body">
-          <div class="hint" style="margin-top:0">操作</div>
-          <div class="btns">
-            <button onclick="saveConfig()">💾 保存配置</button>
-            <button onclick="reloadConfig()">↺ 重读配置</button>
-            <button class="ghost" onclick="log('↺ 已重读配置')">清空日志</button>
-          </div>
-          <div class="log" id="log-sys"></div>
-        </div>
-      </div>
-    </section>
-  </main>
-</div>
+  <!-- ⑤ 同步与状态 -->
+  <section class="card">
+    <div class="ch"><span class="n">⑤</span>同步与状态 <span class="sub" id="sync-mode-label">中心模式 · SSH 下发</span>
+      <div class="spacer"></div><span class="cnt" id="sync-hint"></span></div>
+    <div class="body">
+      <div class="btns" id="sync-btns"></div>
+      <div class="log" id="log-sync"><span class="t">— 选择上方功能执行。先「检查」看 diff，再「同步」。</span></div>
+      <div class="statusbar" id="statusbar"><div class="dot"></div><span id="status-text">空闲</span>
+        <div class="spacer"></div><button class="ghost" onclick="clearLog($('log-sync'))">清空日志</button></div>
+    </div>
+  </section>
+
+  <!-- ⑥ 诊断 -->
+  <section class="card">
+    <div class="ch"><span class="n">⑥</span>诊断 <span class="sub">改得怎么样 · 连接/现状/模型对比 · 接入点</span></div>
+    <div class="body">
+      <div class="btns" id="diag-btns"></div>
+      <div class="log" id="log-diag"><span class="t">— 诊断输出。</span></div>
+      <label style="margin-top:16px">Agent 接入点（动态发现）</label>
+      <table><thead><tr><th style="width:110px">adapter</th><th>说明</th></tr></thead><tbody id="adapter-table"></tbody></table>
+    </div>
+  </section>
+
+  <!-- ⑦ 维护脚本 -->
+  <section class="card">
+    <div class="ch"><span class="n">⑦</span>维护脚本 <span class="sub">一次性动作 · 屏蔽下游自带 provider/模型</span></div>
+    <div class="body">
+      <div id="scripts-wrap"></div>
+      <div class="log" id="log-scripts"></div>
+    </div>
+  </section>
+</main>
 <div class="toast" id="toast"></div>
 
 <script>
 const $=id=>document.getElementById(id);
 let CONFIG={cpa:{},hosts:{},adapter_instances:{},targets:[]};
 let ADAPTERS={names:[],hosts:{},adapter_instances:{},targets:[]};
+let currentMode="central";
 
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200);}
 function setBusy(b){$("statusbar").classList.toggle("busy",b);$("status-text").textContent=b?"执行中…":"空闲";}
 async function api(path,body){const o=body!==undefined?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{};return (await fetch(path,o)).json();}
-
-function log(text,cls,target){const el=target||$("log");const d=document.createElement("div");if(cls)d.className=cls;d.textContent=text;el.appendChild(d);el.scrollTop=el.scrollHeight;}
+function log(text,cls,target){const el=target||$("log-sync");const d=document.createElement("div");if(cls)d.className=cls;d.textContent=text;el.appendChild(d);el.scrollTop=el.scrollHeight;}
 function clearLog(el){if(el)el.innerHTML="";}
 
-/* ---- tab 切换 ---- */
-document.querySelectorAll(".nav button").forEach(b=>{
-  b.addEventListener("click",()=>{
-    document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("on"));
-    b.classList.add("on");
-    const t=b.dataset.tab;
-    ["config","machine","sync","diag","system"].forEach(x=>$("tab-"+x).classList.toggle("hide",x!==t));
-    $("tab-title").textContent=b.textContent.trim();
-  });
-});
+/* ---- 模式切换：重建 ⑤⑥ 按钮，④ 拓扑卡仅中心 ---- */
+const SYNC_CMDS={central:[["check","🔍 检查（干跑）",""],["apply","🚀 同步","primary"],["models","📡 扫描模型",""],["list","📋 状态",""]],
+                 client:[["check","🔍 检查（干跑）",""],["apply","🚀 同步","primary"],["list","📋 状态",""]]};
+const DIAG_CMDS={central:[["doctor","🩺 诊断","primary"],["list","📋 各 adapter 现状",""],["models","📡 CPA 模型",""]],
+                 client:[["doctor","🩺 诊断","primary"]]};
+function setMode(m){
+  currentMode=m;
+  document.querySelectorAll(".modebtn").forEach(b=>b.classList.toggle("on",b.dataset.mode===m));
+  $("card-topo").classList.toggle("hide",m!=="central");
+  $("sync-mode-label").textContent=m==="central"?"中心模式 · SSH 下发":"客户端模式 · 本机自拉";
+  $("sync-hint").textContent=m==="central"?"":"无 SSH，本机自拉";
+  const sb=$("sync-btns");sb.innerHTML="";
+  SYNC_CMDS[m].forEach(([c,txt,cls])=>{const b=document.createElement("button");if(cls)b.className=cls;b.textContent=txt;b.onclick=()=>runCmd(c);sb.appendChild(b);});
+  const db=$("diag-btns");db.innerHTML="";
+  DIAG_CMDS[m].forEach(([c,txt,cls])=>{const b=document.createElement("button");if(cls)b.className=cls;b.textContent=txt;b.onclick=()=>runCmd(c);db.appendChild(b);});
+}
 
 /* ---- 配置表单 ---- */
 function fillForm(cfg){
@@ -319,10 +269,10 @@ function readForm(){
 async function saveConfig(){
   const cfg=readForm();
   const r=await api("/api/config",{config:cfg});
-  if(r.ok){log("✓ 配置已保存","ok",$("log-sys"));toast("配置已保存");}
-  else log("✗ 保存失败: "+(r.error||""),"err",$("log-sys"));
+  if(r.ok){log("✓ 配置已保存","ok",$("log-sync"));toast("配置已保存");}
+  else log("✗ 保存失败: "+(r.error||""),"err",$("log-sync"));
 }
-async function reloadConfig(){await loadConfig();log("↺ 配置已重读",null,$("log-sys"));}
+async function reloadConfig(){await loadConfig();log("↺ 配置已重读",null,$("log-sync"));}
 
 /* ---- targets ---- */
 function buildTargets(sel){
@@ -335,7 +285,6 @@ function buildTargets(sel){
     cb.addEventListener("change",()=>lab.classList.toggle("on",cb.checked));
     lab.appendChild(cb);lab.appendChild(document.createTextNode(a));box.appendChild(lab);
   });
-  $("targets-cnt").textContent=names.length+" 个";
 }
 
 /* ---- hosts 注册表 ---- */
@@ -349,7 +298,6 @@ function buildHosts(hosts){
       <td><button class="del" onclick="this.closest('tr').remove()">×</button></td>`;
     tb.appendChild(tr);
   });
-  $("hosts-cnt").textContent=Object.keys(hosts||{}).length+" 台";
 }
 function addHost(){
   const tr=document.createElement("tr");
@@ -375,8 +323,8 @@ function buildInstances(inst){
   names.forEach(a=>{
     const list=inst[a]||[];
     const det=document.createElement("details");
-    det.className="card";
-    det.innerHTML=`<summary>${a}<span class="cnt">${list.length} 台</span></summary><div class="body">
+    det.className="card";det.style.boxShadow="none";det.style.marginBottom="8px";det.style.borderRadius="8px";
+    det.innerHTML=`<summary style="cursor:pointer;padding:9px 12px;font-weight:600;font-size:12px">${a}<span style="margin-left:auto;font-size:11px;color:var(--muted)">${list.length} 台</span></summary><div class="body" style="padding:10px 12px">
       <table><thead><tr><th style="width:110px">name</th><th style="width:110px">host</th><th>path</th><th style="width:36px"></th></tr></thead>
       <tbody></tbody></table>
       <button class="addrow" onclick="addInst('${a}',this)">＋ 添加实例</button></div>`;
@@ -393,11 +341,7 @@ function instRow(it){
     <td><button class="del" onclick="this.closest('tr').remove()">×</button></td>`;
   return tr;
 }
-function addInst(name,btn){
-  const tb=btn.closest("details").querySelector("tbody");
-  const tr=instRow({name:"",host:"",path:""});
-  tb.appendChild(tr);
-}
+function addInst(name,btn){btn.closest("details").querySelector("tbody").appendChild(instRow({name:"",host:"",path:""}));}
 function readInstances(){
   const out={};
   $("ai-wrap").querySelectorAll("details").forEach(d=>{
@@ -446,13 +390,12 @@ function readOverrides(){
   return out;
 }
 
-/* ---- 命令 ---- */
-async function runCmd(mode,cmd){
+/* ---- 命令（模式感知） ---- */
+async function runCmd(cmd){
   setBusy(true);
-  const r=await api("/api/run",{mode,cmd});
+  const r=await api("/api/run",{mode:currentMode,cmd});
   setBusy(false);
-  const el=mode==="central"?$("log"):$("log");
-  log(r.output||"(无输出)",r.code===0?"":"err",el);
+  log(r.output||"(无输出)",r.code===0?"":"err",$("log-sync"));
 }
 
 /* ---- scripts ---- */
@@ -464,11 +407,11 @@ function buildScripts(){
   const wrap=$("scripts-wrap");
   Object.entries(SCRIPTS).forEach(([name,s])=>{
     const det=document.createElement("details");
-    det.className="card";
-    let fields=s.fields.map(f=>`<div style="margin-bottom:8px"><label>${f.label}</label><input type="text" id="sc-${name}-${f.k}" placeholder="${f.ph}"></div>`).join("");
-    det.innerHTML=`<summary>${s.title}</summary><div class="body">
+    det.style.border="1px solid var(--line)";det.style.borderRadius="8px";det.style.marginBottom="8px";det.style.overflow="hidden";
+    const fields=s.fields.map(f=>`<div style="margin-bottom:8px"><label>${f.label}</label><input type="text" id="sc-${name}-${f.k}" placeholder="${f.ph}"></div>`).join("");
+    det.innerHTML=`<summary style="cursor:pointer;padding:9px 12px;font-weight:600;font-size:12px">${s.title}</summary><div class="body" style="padding:10px 12px">
       <div class="hint" style="margin-top:0">${s.desc}</div>${fields}
-      <div class="btns" style="margin-top:10px">
+      <div class="btns" style="margin-top:10px;margin-bottom:0">
         <button onclick="runScript('${name}',false)">▶ 执行</button>
         <button onclick="runScript('${name}',true)">🔍 干跑</button>
       </div></div>`;
@@ -477,13 +420,10 @@ function buildScripts(){
 }
 async function runScript(name,dry){
   const params={};
-  SCRIPTS[name].fields.forEach(f=>{
-    const v=$("sc-"+name+"-"+f.k).value.trim();
-    if(v)params[f.k]=v;
-  });
+  SCRIPTS[name].fields.forEach(f=>{const v=$("sc-"+name+"-"+f.k).value.trim();if(v)params[f.k]=v;});
   if(dry)params.dry_run=true;
   const r=await api("/api/scripts",{name,params});
-  log(r.output||"(无输出)",r.code===0?"":"err",$("log-sys"));
+  log(r.output||"(无输出)",r.code===0?"":"err",$("log-scripts"));
   toast(name+(dry?" 干跑完成":" 执行完成"));
 }
 
@@ -505,6 +445,7 @@ async function loadVersion(){
   const r=await api("/api/version");
   if(r.ok){$("ver").textContent=r.cpa_sync||"?";$("ver-adapters").textContent=r.adapters+" adapter";}
 }
+setMode("central");
 loadConfig();loadAdapters();loadVersion();
 </script>
 </body>
