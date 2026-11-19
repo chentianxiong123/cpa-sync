@@ -155,12 +155,14 @@
                 <option value="text">text（纯文本）</option>
                 <option value="text,image">text,image（默认识图）</option>
               </select></div>
-            <div><label>② image_models（通配符匹配，命中叠加 image）</label>
-              <input type="text" id="image_models" placeholder='["*"] 或 sensenova-*, gemini-*'></div>
+            <div><label>② image_models（通配符，命中叠加 image；逗号分隔）</label>
+              <input type="text" id="image_models" placeholder="如 * 或 sensenova-*, gemini-*"></div>
           </div>
           <label>③ model_overrides（模型级覆盖，最高优先级）</label>
-          <textarea id="model_overrides" placeholder='{"sensenova-6.8-flash-lite": {"input": ["text","image"]}}'></textarea>
-          <div class="hint">JSON 对象：模型名 → {input, reasoning, context_window, max_tokens}</div>
+          <table><thead><tr><th>模型名</th><th style="width:150px">input</th><th style="width:100px">reasoning</th><th style="width:110px">context</th><th style="width:110px">max_tokens</th><th style="width:36px"></th></tr></thead>
+          <tbody id="ov-tbody"></tbody></table>
+          <button class="addrow" onclick="addOverride()">＋ 添加模型覆盖</button>
+          <div class="hint">模型名 → {input, reasoning, context_window, max_tokens}，优先级高于全局</div>
         </div>
       </details>
     </section>
@@ -290,8 +292,8 @@ function fillForm(cfg){
   $("exclude_models").value=(cpa.exclude_models||[]).join(", ");
   $("strategy").value=cfg.strategy||"replace";
   $("default_input_modes").value=(cpa.default_input_modes||["text"]).join(",");
-  $("image_models").value=JSON.stringify(cpa.image_models||[]);
-  $("model_overrides").value=JSON.stringify(cpa.model_overrides||{},null,2);
+  $("image_models").value=(cpa.image_models||[]).join(", ");
+  buildOverrides(cpa.model_overrides||{});
   buildTargets(cfg.targets||[]);
   buildHosts(cfg.hosts||{});
   buildInstances(cfg.adapter_instances||{});
@@ -306,8 +308,8 @@ function readForm(){
   cpa.include_models=$("include_models").value.split(",").map(s=>s.trim()).filter(Boolean);
   cpa.exclude_models=$("exclude_models").value.split(",").map(s=>s.trim()).filter(Boolean);
   cpa.default_input_modes=$("default_input_modes").value.split(",");
-  try{cpa.image_models=JSON.parse($("image_models").value||"[]");}catch(e){toast("image_models JSON 格式错误");}
-  try{cpa.model_overrides=JSON.parse($("model_overrides").value||"{}");}catch(e){toast("model_overrides JSON 格式错误");}
+  cpa.image_models=$("image_models").value.split(",").map(s=>s.trim()).filter(Boolean);
+  cpa.model_overrides=readOverrides();
   CONFIG.strategy=$("strategy").value;
   CONFIG.targets=[...document.querySelectorAll("#targets input:checked")].map(i=>i.value);
   CONFIG.hosts=readHosts();
@@ -406,6 +408,40 @@ function readInstances(){
       if(g("name"))list.push({name:g("name"),host:g("host"),path:g("path")});
     });
     if(list.length)out[a]=list;
+  });
+  return out;
+}
+
+/* ---- 模型级覆盖表格 ---- */
+function buildOverrides(ov){
+  const tb=$("ov-tbody");tb.innerHTML="";
+  Object.entries(ov||{}).forEach(([m,o])=>tb.appendChild(ovRow(m,o)));
+}
+function ovRow(m,o){
+  o=o||{};
+  const input=(o.input||[]).join(",");
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td><input class="mini" data-k="model" value="${m}"></td>
+    <td><select class="mini" data-k="input"><option value="">—</option><option ${input==="text"?"selected":""}>text</option><option ${input==="text,image"?"selected":""}>text,image</option></select></td>
+    <td><select class="mini" data-k="reasoning"><option value="">—</option><option ${o.reasoning?"selected":""} value="true">on</option></select></td>
+    <td><input class="mini" data-k="context" value="${o.context_window||""}" placeholder="全局"></td>
+    <td><input class="mini" data-k="max" value="${o.max_tokens||""}" placeholder="全局"></td>
+    <td><button class="del" onclick="this.closest('tr').remove()">×</button></td>`;
+  return tr;
+}
+function addOverride(){ $("ov-tbody").appendChild(ovRow("",{})); }
+function readOverrides(){
+  const out={};
+  $("ov-tbody").querySelectorAll("tr").forEach(tr=>{
+    const g=id=>tr.querySelector(`[data-k="${id}"]`).value;
+    const model=g("model").trim();
+    if(!model)return;
+    const o={};
+    const input=g("input");if(input)o.input=input.split(",");
+    const reason=g("reasoning");if(reason)o.reasoning=reason;
+    const ctx=g("context");if(ctx)o.context_window=parseInt(ctx);
+    const mx=g("max");if(mx)o.max_tokens=parseInt(mx);
+    out[model]=o;
   });
   return out;
 }
