@@ -114,6 +114,7 @@
     <div class="ch"><span class="n">②</span>模型属性 <span class="sub">全局默认 ⊕ 模型级覆盖 · 识图/上下文/思考/输出</span>
       <div class="spacer"></div><button class="ghost" onclick="loadModels()">↻ 刷新模型</button></div>
     <div class="body">
+      <label style="margin-top:0;font-weight:650;font-size:13px">▍全局默认（所有模型统一 · 改一处全改）</label>
       <div class="row3">
         <div><label>全局上下文窗口</label><input type="number" id="context_window" step="1024"></div>
         <div><label>全局最大输出</label><input type="number" id="max_tokens" step="1024"></div>
@@ -136,7 +137,7 @@
         <option value="replace">replace — 全盘对齐 CPA（清幽灵）</option>
         <option value="merge">merge — 只增不删（保留下游额外模型）</option>
       </select>
-      <label style="margin-top:16px">模型级覆盖（CPA 实际模型 · 空=用全局默认）</label>
+      <label style="margin-top:16px;font-weight:650;font-size:13px">▍模型级覆盖（单模型 · 覆盖全局默认）</label>
       <div class="hint" id="models-hint">加载模型…</div>
       <table><thead><tr><th>模型</th><th style="width:130px">input</th><th style="width:120px">contextWindow</th><th style="width:110px">maxTokens</th><th style="width:100px">reasoning</th><th style="width:56px"></th></tr></thead>
       <tbody id="models-tbody"></tbody></table>
