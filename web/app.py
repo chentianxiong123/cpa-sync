@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """cpa-sync Web 控制面板 —— 纯标准库实现（零新依赖）。
 
-复用 cpa-sync 的 cmd_* 全部逻辑（SourceFileLoader 加载主入口），
-把输出捕获成 JSON 给前端。配置读写走 cpa-config.yaml。
+覆盖 cpa-sync 全部功能：
+- 中心模式命令（models/list/check/apply/doctor）—— 复用 cpa-sync cmd_*
+- 客户端模式命令（agent-sync list/check/apply/doctor）—— 复用 agent-sync main(argv)
+- 一次性脚本（omp_disable_providers / picoclaw_disable_builtin）
+- 配置读写（cpa-config.yaml：cpa/识图三层/strategy/hosts/adapter_instances/targets）
+- 动态 adapter 发现（adapters.available_names）
 
-用法: .venv/bin/python web/app.py [--host 127.0.0.1] [--port 8080]
+用法: .venv/bin/python web/app.py [--host 127.0.0.1] [--port 17834]
 """
 from __future__ import annotations
 
@@ -12,6 +16,7 @@ import argparse
 import contextlib
 import io
 import json
+import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.machinery import SourceFileLoader
@@ -20,8 +25,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-# 复用 CLI（cpa-sync 无 .py 后缀，用 SourceFileLoader 加载，与 gui/app.py 同法）
+# 复用 CLI（与 gui/app.py 同法：SourceFileLoader）
 _cli = SourceFileLoader("cpa_sync_cli", str(ROOT / "cpa-sync")).load_module()
+_agent = SourceFileLoader("agent_sync_cli", str(ROOT / "agent-sync")).load_module()
+import adapters  # noqa: E402  # available_names() 动态发现
 
 try:
     import yaml
@@ -30,40 +37,26 @@ except ImportError:  # pragma: no cover
 
 CONFIG_PATH = str(ROOT / "config" / "cpa-config.yaml")
 INDEX_PATH = Path(__file__).parent / "static" / "index.html"
+VENV_PY = str(ROOT / ".venv" / "bin" / "python")
 
-# 各 agent 接入点（与 gui/app.py 一致）
-ADAPTER_PATHS = [
-    {"agent": "pi", "path": "本机 ~/.pi/agent/models.json"},
-    {"agent": "opencode", "path": "本机 ~/.config/opencode/opencode.json"},
-    {"agent": "claude", "path": "本机 ~/.cc-switch/cc-switch.db（app_type=claude）"},
-    {"agent": "codex", "path": "本机 ~/.cc-switch/cc-switch.db（app_type=codex）"},
-    {"agent": "dsh", "path": "win11 a1@192.168.31.66:C:\\Users\\a1\\.dsh\\profiles\\web\\cordis.patch.yml"},
-    {"agent": "omp", "path": "win11 a1@192.168.31.66:C:\\Users\\a1\\.omp\\agent\\models.yml"},
-]
-
-COMMANDS = {"models", "list", "check", "apply", "doctor"}
+# 中心 / 客户端 命令集合
+CENTRAL_CMDS = {"models", "list", "check", "apply", "doctor"}
+CLIENT_CMDS = {"list", "check", "apply", "doctor"}
+SCRIPTS = {
+    "omp_disable_providers": "scripts/omp_disable_providers.py",
+    "picoclaw_disable_builtin": "scripts/picoclaw_disable_builtin.py",
+}
 
 
 def _make_args() -> argparse.Namespace:
-    """构造 CLI 命令所需的最小 args（与 gui/app.py 相同字段）。"""
     return argparse.Namespace(config=CONFIG_PATH, targets=[], yes=True, backup=False, force=False)
 
 
-def run_cmd(name: str) -> dict:
-    """执行一条 CLI 命令函数，捕获 stdout/stderr，返回 {code, output}。"""
-    fn = {
-        "models": _cli.cmd_models,
-        "list": _cli.cmd_list,
-        "check": _cli.cmd_check,
-        "apply": _cli.cmd_apply,
-        "doctor": _cli.cmd_doctor,
-    }.get(name)
-    if fn is None:
-        return {"code": 2, "output": f"未知命令: {name}"}
+def run_captured(fn) -> dict:
     buf = io.StringIO()
     try:
         with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
-            code = fn(_make_args())
+            code = fn()
     except SystemExit as e:  # argparse / SystemExit
         code = int(e.code or 0)
     except Exception as e:  # noqa: BLE001
@@ -72,11 +65,72 @@ def run_cmd(name: str) -> dict:
     return {"code": code, "output": buf.getvalue()}
 
 
+def run_central(name: str) -> dict:
+    fn = getattr(_cli, f"cmd_{name}", None)
+    if fn is None:
+        return {"code": 2, "output": f"未知中心命令: {name}"}
+    return run_captured(lambda: fn(_make_args()))
+
+
+def run_client(name: str) -> dict:
+    if name not in CLIENT_CMDS:
+        return {"code": 2, "output": f"未知客户端命令: {name}"}
+    return run_captured(lambda: _agent.main([name]))
+
+
+def run_script(name: str, params: dict | None) -> dict:
+    rel = SCRIPTS.get(name)
+    if rel is None:
+        return {"code": 2, "output": f"未知脚本: {name}"}
+    cmd = [VENV_PY, str(ROOT / rel)]
+    for k, v in (params or {}).items():
+        cmd.append("--" + k.replace("_", "-"))
+        if v is not True:
+            cmd.append(str(v))
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        return {"code": r.returncode, "output": (r.stdout or "") + (r.stderr or "")}
+    except Exception as e:  # noqa: BLE001
+        return {"code": 1, "output": f"✗ {type(e).__name__}: {e}"}
+
+
+def get_adapters_info() -> dict:
+    """动态 adapter 列表 + 配置里的 hosts / adapter_instances / targets。"""
+    try:
+        names = adapters.available_names()
+    except Exception as e:  # noqa: BLE001
+        names = []
+    try:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+    except Exception:  # noqa: BLE001
+        cfg = {}
+    return {
+        "names": names,
+        "hosts": cfg.get("hosts", {}) or {},
+        "adapter_instances": cfg.get("adapter_instances", {}) or {},
+        "targets": cfg.get("targets", []) or [],
+        "strategies": ["replace", "merge"],
+    }
+
+
+def get_version() -> dict:
+    import re
+    ver = "?"
+    try:
+        with open(str(ROOT / "cpa-sync"), encoding="utf-8") as f:
+            m = re.search(r'VERSION\s*=\s*"([^"]+)"', f.read())
+            if m:
+                ver = m.group(1)
+    except Exception:  # noqa: BLE001
+        pass
+    return {"cpa_sync": ver, "agent_sync": "1.0.0", "adapters": len(adapters.available_names())}
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):  # 静默访问日志
         pass
 
-    # ---- 响应辅助 ----
     def _send(self, code: int, body: bytes, ctype: str = "application/json; charset=utf-8"):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
@@ -97,14 +151,13 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/config":
             try:
                 with open(CONFIG_PATH, encoding="utf-8") as f:
-                    data = yaml.safe_load(f) or {}
-                return self._json({"ok": True, "config": data})
+                    return self._json({"ok": True, "config": yaml.safe_load(f) or {}})
             except Exception as e:  # noqa: BLE001
                 return self._json({"ok": False, "error": str(e)}, 500)
-        if p == "/api/adapter-paths":
-            return self._json({"ok": True, "adapters": ADAPTER_PATHS})
-        if p == "/api/status":
-            return self._json({"ok": True, **run_cmd("list")})
+        if p == "/api/adapters":
+            return self._json({"ok": True, **get_adapters_info()})
+        if p == "/api/version":
+            return self._json({"ok": True, **get_version()})
         self._json({"ok": False, "error": "not found"}, 404)
 
     # ---- POST ----
@@ -131,10 +184,19 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": False, "error": str(e)}, 500)
 
         if p == "/api/run":
+            mode = payload.get("mode", "central")
             cmd = payload.get("cmd", "")
-            if cmd not in COMMANDS:
-                return self._json({"ok": False, "error": f"unknown cmd: {cmd}"}, 400)
-            return self._json({"ok": True, **run_cmd(cmd)})
+            if mode == "client":
+                if cmd not in CLIENT_CMDS:
+                    return self._json({"ok": False, "error": f"未知客户端命令: {cmd}"}, 400)
+                return self._json({"ok": True, **run_client(cmd)})
+            if cmd not in CENTRAL_CMDS:
+                return self._json({"ok": False, "error": f"未知中心命令: {cmd}"}, 400)
+            return self._json({"ok": True, **run_central(cmd)})
+
+        if p == "/api/scripts":
+            name = payload.get("name", "")
+            return self._json({"ok": True, **run_script(name, payload.get("params"))})
 
         self._json({"ok": False, "error": "not found"}, 404)
 

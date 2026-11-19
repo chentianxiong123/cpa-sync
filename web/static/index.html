@@ -5,180 +5,299 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>cpa-sync · 控制面板</title>
 <style>
-  :root {
-    --bg:#f4f5f7; --card:#ffffff; --line:#e6e8eb; --text:#1f2937; --muted:#6b7280;
+  :root{
+    --bg:#f4f5f7; --card:#fff; --line:#e6e8eb; --text:#1f2937; --muted:#6b7280;
     --accent:#2563eb; --accent-soft:#eff4ff; --ok:#16a34a; --warn:#d97706; --err:#dc2626;
-    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
-    --radius:12px; --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace; --radius:12px;
+    --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
-  .wrap{max-width:1180px;margin:0 auto;padding:20px}
+  .app{display:flex;min-height:100vh}
 
-  header{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px}
-  header .logo{width:34px;height:34px;border-radius:9px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px}
-  header h1{font-size:17px;margin:0;font-weight:650}
-  header .sub{font-size:12px;color:var(--muted)}
-  header .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);margin-left:auto;box-shadow:0 0 0 4px rgba(22,163,74,.15)}
+  /* ---- 侧边导航 ---- */
+  .side{width:168px;background:var(--card);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+  .side .logo{display:flex;align-items:center;gap:9px;padding:6px 8px 16px;font-weight:700;font-size:15px}
+  .side .logo .ic{width:28px;height:28px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px}
+  .nav{display:flex;flex-direction:column;gap:3px}
+  .nav button{display:flex;align-items:center;gap:9px;padding:9px 10px;border:none;background:none;border-radius:8px;font-size:13px;color:var(--muted);cursor:pointer;text-align:left;transition:all .14s}
+  .nav button:hover{background:var(--bg);color:var(--text)}
+  .nav button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .side .ver{margin-top:auto;padding:10px 8px;font-size:11px;color:var(--muted);border-top:1px solid var(--line)}
+  .side .ver b{color:var(--text)}
 
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  /* ---- 主区 ---- */
+  .main{flex:1;padding:18px 22px;max-width:1080px}
+  .topbar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .topbar h1{font-size:18px;margin:0;font-weight:650}
+  .topbar .sub{font-size:12px;color:var(--muted)}
+  .topbar .spacer{flex:1}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px rgba(22,163,74,.14)}
 
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
-  .card .head{padding:12px 16px;border-bottom:1px solid var(--line);font-weight:650;font-size:13px;color:var(--text);display:flex;align-items:center;gap:8px}
-  .card .head .tag{margin-left:auto;font-size:11px;color:var(--muted);font-weight:500}
-  .card .body{padding:16px}
+  /* ---- 卡片/折叠 ---- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden}
+  details.card summary{cursor:pointer;padding:12px 16px;font-weight:650;font-size:13px;list-style:none;display:flex;align-items:center;gap:8px}
+  details.card summary::-webkit-details-marker{display:none}
+  details.card summary::before{content:"▸";color:var(--muted);font-size:11px;transition:transform .15s}
+  details.card[open] summary::before{transform:rotate(90deg)}
+  details.card summary .cnt{margin-left:auto;font-size:11px;color:var(--muted);font-weight:500}
+  .card .body{padding:14px 16px;border-top:1px solid var(--line)}
 
+  /* ---- 表单 ---- */
   label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px}
-  input[type=text],input[type=password],input[type=number],select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;color:var(--text)}
-  input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  input[type=text],input[type=password],input[type=number],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;color:var(--text);font-family:inherit}
+  textarea{font-family:var(--mono);font-size:12px;resize:vertical;min-height:70px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
   .hint{font-size:11px;color:var(--muted);margin-top:4px}
 
   .checks{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
-  .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;font-size:12px;cursor:pointer;user-select:none;transition:all .15s}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;font-size:12px;cursor:pointer;user-select:none;transition:all .14s}
   .chip input{display:none}
   .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
-  .chip.on::before{content:"✓";font-size:11px}
 
+  /* ---- 按钮 ---- */
   .btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
-  button{padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--text);font-size:13px;cursor:pointer;transition:all .15s}
+  button{padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--text);font-size:13px;cursor:pointer;transition:all .14s}
   button:hover{border-color:var(--accent);color:var(--accent)}
   button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
   button.primary:hover{background:#1d4ed8}
-  button:disabled{opacity:.5;cursor:not-allowed}
   button.ghost{border-color:transparent;background:transparent;color:var(--muted)}
   button.ghost:hover{color:var(--err)}
+  button:disabled{opacity:.5;cursor:not-allowed}
 
-  .log{background:#111827;border-radius:10px;padding:12px;font-family:var(--mono);font-size:12px;line-height:1.55;color:#d1d5db;min-height:280px;max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-word}
-  .log .t{color:#6b7280}
-  .log .ok{color:#4ade80}.log .err{color:#f87171}
-
-  table{width:100%;border-collapse:collapse;font-size:12px}
-  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
-  th{color:var(--muted);font-weight:600}
-  td:first-child{font-family:var(--mono);font-weight:600}
-  .statusbar{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12px;color:var(--muted)}
+  /* ---- 日志 ---- */
+  .log{background:#111827;border-radius:10px;padding:12px;font-family:var(--mono);font-size:12px;line-height:1.55;color:#d1d5db;min-height:160px;max-height:340px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+  .log .ok{color:#4ade80}.log .err{color:#f87171}.log .t{color:#6b7280}
+  .statusbar{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--muted)}
   .statusbar .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
   .statusbar.busy .dot{background:var(--warn)}
-  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none}
+
+  /* ---- 表格 ---- */
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600}
+  td input{padding:5px 7px;font-size:12px}
+  .mini{width:100%}
+  .del{border:none;background:none;color:var(--muted);cursor:pointer;font-size:15px;padding:2px 6px;border-radius:6px}
+  .del:hover{color:var(--err);background:var(--bg)}
+  .addrow{background:none;border:1px dashed var(--line);border-radius:8px;width:100%;padding:7px;color:var(--muted);font-size:12px;cursor:pointer;margin-top:8px}
+  .addrow:hover{color:var(--accent);border-color:var(--accent)}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
   .toast.show{opacity:.95}
+  .hide{display:none}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="logo">◆</div>
-    <div>
-      <h1>cpa-sync 控制面板</h1>
-      <div class="sub">CPA 配置一键同步 · 集群网关</div>
-    </div>
-    <div class="dot" id="dot" title="服务在线"></div>
-  </header>
+<div class="app">
+  <!-- 侧边导航 -->
+  <aside class="side">
+    <div class="logo"><div class="ic">◆</div>cpa-sync</div>
+    <nav class="nav">
+      <button data-tab="config" class="on">⚙️ 配置</button>
+      <button data-tab="machine">🖥️ 机器</button>
+      <button data-tab="sync">🔁 同步</button>
+      <button data-tab="diag">🩺 诊断</button>
+      <button data-tab="system">🧰 系统</button>
+    </nav>
+    <div class="ver">cpa-sync <b id="ver">…</b><br><span id="ver-adapters"></span></div>
+  </aside>
 
-  <div class="grid">
-    <!-- 左：配置 -->
-    <div class="card">
-      <div class="head">配置<span class="tag" id="cfg-path"></span></div>
-      <div class="body">
-        <label>CPA Base URL</label>
-        <input type="text" id="base_url" placeholder="http://192.168.31.213:8317/v1">
-        <label>API Key</label>
-        <input type="password" id="api_key" placeholder="123456">
-
-        <div class="row3">
-          <div><label>上下文窗口</label><input type="number" id="context_window" step="1024"></div>
-          <div><label>最大输出</label><input type="number" id="max_tokens" step="1024"></div>
-          <div><label>自动压缩阈值</label><input type="number" id="auto_compact" step="1024"></div>
-        </div>
-
-        <label>模型白名单（逗号分隔，空=动态扫 CPA）</label>
-        <input type="text" id="include_models" placeholder="如 sensenova-6.8-flash-lite, kimi-k3.1-pro">
-        <div class="hint">支持通配符 *.flash</div>
-        <label>模型黑名单（逗号分隔）</label>
-        <input type="text" id="exclude_models" placeholder="如 *.preview">
-
-        <label>同步策略</label>
-        <select id="strategy">
-          <option value="replace">replace — 全盘对齐 CPA 模型（清幽灵）</option>
-          <option value="merge">merge — 只增不删（保留下游额外模型）</option>
-        </select>
-
-        <label>同步目标</label>
-        <div class="checks" id="targets"></div>
+  <!-- 主区 -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="tab-title">配置</h1>
+        <div class="sub" id="cfg-path">config/cpa-config.yaml</div>
       </div>
+      <div class="spacer"></div>
+      <div class="dot" title="在线"></div>
     </div>
 
-    <!-- 右：操作 + 日志 -->
-    <div>
-      <div class="card">
-        <div class="head">操作</div>
+    <!-- ① 配置 -->
+    <section id="tab-config">
+      <details class="card" open>
+        <summary>CPA 连接</summary>
+        <div class="body"><div class="row">
+          <div><label>Base URL</label><input type="text" id="base_url" placeholder="http://192.168.31.213:8317/v1"></div>
+          <div><label>API Key</label><input type="password" id="api_key" placeholder="123456"></div>
+        </div></div>
+      </details>
+
+      <details class="card" open>
+        <summary>模型与上下文</summary>
         <div class="body">
-          <div class="btns">
-            <button id="b-models">📡 扫描模型</button>
-            <button id="b-list">📋 当前状态</button>
-            <button id="b-check">🔍 检查（干跑）</button>
-            <button id="b-apply" class="primary">🚀 同步</button>
-            <button id="b-doctor">🩺 诊断</button>
-            <button id="b-save">💾 保存配置</button>
-            <button id="b-reload" class="ghost">↺</button>
+          <div class="row">
+            <div><label>上下文窗口</label><input type="number" id="context_window" step="1024"></div>
+            <div><label>最大输出</label><input type="number" id="max_tokens" step="1024"></div>
           </div>
-          <div class="log" id="log"><span class="t">— 就绪。点击上方按钮执行；保存配置后点「检查」确认差异，再「同步」。</span></div>
+          <label>codex 自动压缩阈值</label><input type="number" id="auto_compact" step="1024">
+          <div class="row">
+            <div><label>模型白名单（逗号分隔，空=动态扫）</label><input type="text" id="include_models" placeholder="留空 = 扫 CPA 全部"><div class="hint">支持通配符 *.flash</div></div>
+            <div><label>模型黑名单（逗号分隔）</label><input type="text" id="exclude_models" placeholder="如 *.preview"></div>
+          </div>
+          <label>同步策略</label>
+          <select id="strategy">
+            <option value="replace">replace — 全盘对齐 CPA（清幽灵）</option>
+            <option value="merge">merge — 只增不删（保留下游额外模型）</option>
+          </select>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary>识图能力（三层优先级）</summary>
+        <div class="body">
+          <div class="row">
+            <div><label>① default_input_modes（全局兜底）</label>
+              <select id="default_input_modes">
+                <option value="text">text（纯文本）</option>
+                <option value="text,image">text,image（默认识图）</option>
+              </select></div>
+            <div><label>② image_models（通配符匹配，命中叠加 image）</label>
+              <input type="text" id="image_models" placeholder='["*"] 或 sensenova-*, gemini-*'></div>
+          </div>
+          <label>③ model_overrides（模型级覆盖，最高优先级）</label>
+          <textarea id="model_overrides" placeholder='{"sensenova-6.8-flash-lite": {"input": ["text","image"]}}'></textarea>
+          <div class="hint">JSON 对象：模型名 → {input, reasoning, context_window, max_tokens}</div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ② 机器 -->
+    <section id="tab-machine" class="hide">
+      <details class="card" open>
+        <summary>主机注册表 hosts<span class="cnt" id="hosts-cnt"></span></summary>
+        <div class="body">
+          <table><thead><tr><th style="width:120px">ssh 别名</th><th style="width:110px">平台</th><th style="width:36px"></th></tr></thead>
+          <tbody id="hosts-tbody"></tbody></table>
+          <button class="addrow" onclick="addHost()">＋ 添加主机</button>
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary>Adapter 多主机实例 adapter_instances</summary>
+        <div class="body" id="ai-wrap"></div>
+      </details>
+
+      <details class="card" open>
+        <summary>同步目标 targets<span class="cnt" id="targets-cnt"></span></summary>
+        <div class="body">
+          <div class="checks" id="targets"></div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ③ 同步 -->
+    <section id="tab-sync" class="hide">
+      <div class="card">
+        <div class="body">
+          <div class="hint" style="margin-top:0">中心模式（cpa-sync · 在中心机 SSH 下发各机）</div>
+          <div class="btns">
+            <button onclick="runCmd('central','check')">🔍 检查（干跑）</button>
+            <button class="primary" onclick="runCmd('central','apply')">🚀 同步</button>
+            <button onclick="runCmd('central','models')">📡 扫描模型</button>
+            <button onclick="runCmd('central','list')">📋 状态</button>
+          </div>
+          <div class="hint" style="margin-top:14px">客户端模式（agent-sync · 本机无 SSH 自拉）</div>
+          <div class="btns">
+            <button onclick="runCmd('client','check')">🔍 检查（干跑）</button>
+            <button class="primary" onclick="runCmd('client','apply')">🚀 同步</button>
+            <button onclick="runCmd('client','list')">📋 状态</button>
+            <button onclick="runCmd('client','doctor')">🩺 诊断</button>
+          </div>
+          <div class="log" id="log"><span class="t">— 选择模式执行。先「检查」看 diff，再「同步」。</span></div>
           <div class="statusbar" id="statusbar"><div class="dot"></div><span id="status-text">空闲</span></div>
         </div>
       </div>
+    </section>
 
-      <div class="card" style="margin-top:16px">
-        <div class="head">Agent 接入点</div>
+    <!-- ④ 诊断 -->
+    <section id="tab-diag" class="hide">
+      <div class="card">
         <div class="body">
-          <table><thead><tr><th style="width:90px">agent</th><th>配置文件</th></tr></thead><tbody id="adapter-table"></tbody></table>
+          <div class="btns">
+            <button class="primary" onclick="runCmd('central','doctor')">🩺 诊断</button>
+            <button onclick="runCmd('central','list')">📋 各 adapter 现状</button>
+            <button onclick="runCmd('central','models')">📡 CPA 模型</button>
+          </div>
+          <div class="log" id="log-diag"><span class="t">— 诊断输出。</span></div>
         </div>
       </div>
-    </div>
-  </div>
+      <div class="card">
+        <div class="body"><div class="hint" style="margin-top:0">Agent 接入点（动态发现）</div>
+          <table><thead><tr><th style="width:110px">adapter</th><th>说明</th></tr></thead><tbody id="adapter-table"></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ⑤ 系统 -->
+    <section id="tab-system" class="hide">
+      <div class="card">
+        <div class="body"><div class="hint" style="margin-top:0">一次性维护脚本（屏蔽下游自带 provider / 模型）</div>
+          <div id="scripts-wrap"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="body">
+          <div class="hint" style="margin-top:0">操作</div>
+          <div class="btns">
+            <button onclick="saveConfig()">💾 保存配置</button>
+            <button onclick="reloadConfig()">↺ 重读配置</button>
+            <button class="ghost" onclick="log('↺ 已重读配置')">清空日志</button>
+          </div>
+          <div class="log" id="log-sys"></div>
+        </div>
+      </div>
+    </section>
+  </main>
 </div>
 <div class="toast" id="toast"></div>
 
 <script>
-const $ = id => document.getElementById(id);
-const ADAPTERS = ["pi","opencode","claude","codex","dsh","omp"];
-const CMD_BTNS = { "b-models":"models", "b-list":"list", "b-check":"check", "b-apply":"apply", "b-doctor":"doctor" };
+const $=id=>document.getElementById(id);
+let CONFIG={cpa:{},hosts:{},adapter_instances:{},targets:[]};
+let ADAPTERS={names:[],hosts:{},adapter_instances:{},targets:[]};
 
-function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
-function setBusy(b){ $("statusbar").classList.toggle("busy",b); $("status-text").textContent = b?"执行中…":"空闲"; }
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200);}
+function setBusy(b){$("statusbar").classList.toggle("busy",b);$("status-text").textContent=b?"执行中…":"空闲";}
+async function api(path,body){const o=body!==undefined?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{};return (await fetch(path,o)).json();}
 
-async function api(path, body){
-  const opts = body!==undefined ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : {};
-  const r = await fetch(path, opts);
-  return r.json();
-}
+function log(text,cls,target){const el=target||$("log");const d=document.createElement("div");if(cls)d.className=cls;d.textContent=text;el.appendChild(d);el.scrollTop=el.scrollHeight;}
+function clearLog(el){if(el)el.innerHTML="";}
 
-// 日志
-function log(text, cls){
-  const el=$("log");
-  const span=document.createElement("div");
-  if(cls) span.className=cls;
-  span.textContent=text;
-  el.appendChild(span);
-  el.scrollTop=el.scrollHeight;
-}
-function clearLog(){ $("log").innerHTML=""; }
-
-// 配置
-function buildTargets(sel){
-  const box=$("targets"); box.innerHTML="";
-  ADAPTERS.forEach(a=>{
-    const label=document.createElement("label");
-    label.className="chip"+(sel.includes(a)?" on":"");
-    const cb=document.createElement("input"); cb.type="checkbox"; cb.value=a; cb.checked=sel.includes(a);
-    cb.addEventListener("change",()=>label.classList.toggle("on",cb.checked));
-    label.appendChild(cb); label.appendChild(document.createTextNode(a));
-    box.appendChild(label);
+/* ---- tab 切换 ---- */
+document.querySelectorAll(".nav button").forEach(b=>{
+  b.addEventListener("click",()=>{
+    document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");
+    const t=b.dataset.tab;
+    ["config","machine","sync","diag","system"].forEach(x=>$("tab-"+x).classList.toggle("hide",x!==t));
+    $("tab-title").textContent=b.textContent.trim();
   });
+});
+
+/* ---- 配置表单 ---- */
+function fillForm(cfg){
+  CONFIG=cfg;
+  const cpa=cfg.cpa||{};
+  $("base_url").value=cpa.base_url||"";$("api_key").value=cpa.api_key||"";
+  $("context_window").value=cpa.context_window||256000;
+  $("max_tokens").value=cpa.max_tokens||16384;
+  $("auto_compact").value=cpa.auto_compact_token_limit||200000;
+  $("include_models").value=(cpa.include_models||[]).join(", ");
+  $("exclude_models").value=(cpa.exclude_models||[]).join(", ");
+  $("strategy").value=cfg.strategy||"replace";
+  $("default_input_modes").value=(cpa.default_input_modes||["text"]).join(",");
+  $("image_models").value=JSON.stringify(cpa.image_models||[]);
+  $("model_overrides").value=JSON.stringify(cpa.model_overrides||{},null,2);
+  buildTargets(cfg.targets||[]);
+  buildHosts(cfg.hosts||{});
+  buildInstances(cfg.adapter_instances||{});
 }
 function readForm(){
-  const cpa={};
+  const cpa=CONFIG.cpa=CONFIG.cpa||{};
   cpa.base_url=$("base_url").value.trim();
   cpa.api_key=$("api_key").value.trim();
   cpa.context_window=parseInt($("context_window").value)||256000;
@@ -186,62 +305,171 @@ function readForm(){
   cpa.auto_compact_token_limit=parseInt($("auto_compact").value)||200000;
   cpa.include_models=$("include_models").value.split(",").map(s=>s.trim()).filter(Boolean);
   cpa.exclude_models=$("exclude_models").value.split(",").map(s=>s.trim()).filter(Boolean);
-  const targets=[...document.querySelectorAll("#targets input:checked")].map(i=>i.value);
-  return {cpa, strategy:$("strategy").value, targets};
-}
-function fillForm(cfg){
-  const cpa=cfg.cpa||{};
-  $("base_url").value=cpa.base_url||"";
-  $("api_key").value=cpa.api_key||"";
-  $("context_window").value=cpa.context_window||256000;
-  $("max_tokens").value=cpa.max_tokens||16384;
-  $("auto_compact").value=cpa.auto_compact_token_limit||200000;
-  $("include_models").value=(cpa.include_models||[]).join(", ");
-  $("exclude_models").value=(cpa.exclude_models||[]).join(", ");
-  $("strategy").value=cfg.strategy||"replace";
-  buildTargets(cfg.targets||[]);
-}
-
-// 命令
-async function runCmd(cmd){
-  setBusy(true);
-  const r=await api("/api/run",{cmd});
-  setBusy(false);
-  const cls=r.code===0?"":"err";
-  log(r.output||"(无输出)", cls);
-  return r;
-}
-
-async function loadConfig(){
-  try{
-    const r=await api("/api/config");
-    if(r.ok){ fillForm(r.config); log("✓ 配置已加载","ok"); }
-    else log("✗ 加载配置失败: "+r.error,"err");
-  }catch(e){ log("✗ 加载配置失败: "+e,"err"); }
+  cpa.default_input_modes=$("default_input_modes").value.split(",");
+  try{cpa.image_models=JSON.parse($("image_models").value||"[]");}catch(e){toast("image_models JSON 格式错误");}
+  try{cpa.model_overrides=JSON.parse($("model_overrides").value||"{}");}catch(e){toast("model_overrides JSON 格式错误");}
+  CONFIG.strategy=$("strategy").value;
+  CONFIG.targets=[...document.querySelectorAll("#targets input:checked")].map(i=>i.value);
+  CONFIG.hosts=readHosts();
+  CONFIG.adapter_instances=readInstances();
+  return CONFIG;
 }
 async function saveConfig(){
+  const cfg=readForm();
+  const r=await api("/api/config",{config:cfg});
+  if(r.ok){log("✓ 配置已保存","ok",$("log-sys"));toast("配置已保存");}
+  else log("✗ 保存失败: "+(r.error||""),"err",$("log-sys"));
+}
+async function reloadConfig(){await loadConfig();log("↺ 配置已重读",null,$("log-sys"));}
+
+/* ---- targets ---- */
+function buildTargets(sel){
+  const box=$("targets");box.innerHTML="";
+  const names=ADAPTERS.names.length?ADAPTERS.names:["pi","opencode","claude","codex","omp","dsh","picoclaw","crush","openclaw","hermes"];
+  names.forEach(a=>{
+    const lab=document.createElement("label");
+    lab.className="chip"+(sel.includes(a)?" on":"");
+    const cb=document.createElement("input");cb.type="checkbox";cb.value=a;cb.checked=sel.includes(a);
+    cb.addEventListener("change",()=>lab.classList.toggle("on",cb.checked));
+    lab.appendChild(cb);lab.appendChild(document.createTextNode(a));box.appendChild(lab);
+  });
+  $("targets-cnt").textContent=names.length+" 个";
+}
+
+/* ---- hosts 注册表 ---- */
+function buildHosts(hosts){
+  const tb=$("hosts-tbody");tb.innerHTML="";
+  Object.entries(hosts||{}).forEach(([name,h])=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td><input class="mini" data-k="name" value="${name}"></td>
+      <td><input class="mini" data-k="ssh" value="${h.ssh||""}" placeholder="ssh别名"></td>
+      <td><select class="mini" data-k="platform"><option ${h.platform==="win"?"selected":""}>win</option><option ${h.platform!=="win"?"selected":""}>unix</option></select></td>
+      <td><button class="del" onclick="this.closest('tr').remove()">×</button></td>`;
+    tb.appendChild(tr);
+  });
+  $("hosts-cnt").textContent=Object.keys(hosts||{}).length+" 台";
+}
+function addHost(){
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td><input class="mini" data-k="name" placeholder="如 win11"></td>
+    <td><input class="mini" data-k="ssh" placeholder="ssh别名"></td>
+    <td><select class="mini" data-k="platform"><option>win</option><option>unix</option></select></td>
+    <td><button class="del" onclick="this.closest('tr').remove()">×</button></td>`;
+  $("hosts-tbody").appendChild(tr);
+}
+function readHosts(){
+  const out={};
+  $("hosts-tbody").querySelectorAll("tr").forEach(tr=>{
+    const g=id=>tr.querySelector(`[data-k="${id}"]`).value.trim();
+    if(g("name"))out[g("name")]={ssh:g("ssh")||g("name"),platform:g("platform")};
+  });
+  return out;
+}
+
+/* ---- adapter_instances ---- */
+function buildInstances(inst){
+  const wrap=$("ai-wrap");wrap.innerHTML="";
+  const names=ADAPTERS.names.length?ADAPTERS.names:["omp","dsh","picoclaw","crush","openclaw","hermes"];
+  names.forEach(a=>{
+    const list=inst[a]||[];
+    const det=document.createElement("details");
+    det.className="card";
+    det.innerHTML=`<summary>${a}<span class="cnt">${list.length} 台</span></summary><div class="body">
+      <table><thead><tr><th style="width:110px">name</th><th style="width:110px">host</th><th>path</th><th style="width:36px"></th></tr></thead>
+      <tbody></tbody></table>
+      <button class="addrow" onclick="addInst('${a}',this)">＋ 添加实例</button></div>`;
+    const tb=det.querySelector("tbody");
+    list.forEach(it=>tb.appendChild(instRow(it)));
+    wrap.appendChild(det);
+  });
+}
+function instRow(it){
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td><input class="mini" data-k="name" value="${it.name||""}"></td>
+    <td><input class="mini" data-k="host" value="${it.host||""}"></td>
+    <td><input class="mini" data-k="path" value="${it.path||""}"></td>
+    <td><button class="del" onclick="this.closest('tr').remove()">×</button></td>`;
+  return tr;
+}
+function addInst(name,btn){
+  const tb=btn.closest("details").querySelector("tbody");
+  const tr=instRow({name:"",host:"",path:""});
+  tb.appendChild(tr);
+}
+function readInstances(){
+  const out={};
+  $("ai-wrap").querySelectorAll("details").forEach(d=>{
+    const a=d.querySelector("summary").childNodes[0].textContent.trim();
+    const list=[];
+    d.querySelector("tbody").querySelectorAll("tr").forEach(tr=>{
+      const g=id=>tr.querySelector(`[data-k="${id}"]`).value.trim();
+      if(g("name"))list.push({name:g("name"),host:g("host"),path:g("path")});
+    });
+    if(list.length)out[a]=list;
+  });
+  return out;
+}
+
+/* ---- 命令 ---- */
+async function runCmd(mode,cmd){
   setBusy(true);
-  const r=await api("/api/config",{config:readForm()});
+  const r=await api("/api/run",{mode,cmd});
   setBusy(false);
-  if(r.ok){ log("✓ 配置已保存","ok"); toast("配置已保存"); }
-  else { log("✗ 保存失败: "+(r.error||""),"err"); }
+  const el=mode==="central"?$("log"):$("log");
+  log(r.output||"(无输出)",r.code===0?"":"err",el);
+}
+
+/* ---- scripts ---- */
+const SCRIPTS={
+  omp_disable_providers:{title:"屏蔽 omp 自带 provider",desc:"写 disabledProviders 到 omp config.yml",fields:[{k:"config",label:"config.yml 路径",ph:"~/.omp/agent/config.yml"},{k:"keep",label:"保留 provider id",ph:"web"}]},
+  picoclaw_disable_builtin:{title:"删 picoclaw 内置模型",desc:"从 model_list 删非 cpa 条目",fields:[{k:"config",label:"config.json 路径",ph:"~/.picoclaw/config.json"},{k:"keep",label:"保留 provider id",ph:"cpa"}]}
+};
+function buildScripts(){
+  const wrap=$("scripts-wrap");
+  Object.entries(SCRIPTS).forEach(([name,s])=>{
+    const det=document.createElement("details");
+    det.className="card";
+    let fields=s.fields.map(f=>`<div style="margin-bottom:8px"><label>${f.label}</label><input type="text" id="sc-${name}-${f.k}" placeholder="${f.ph}"></div>`).join("");
+    det.innerHTML=`<summary>${s.title}</summary><div class="body">
+      <div class="hint" style="margin-top:0">${s.desc}</div>${fields}
+      <div class="btns" style="margin-top:10px">
+        <button onclick="runScript('${name}',false)">▶ 执行</button>
+        <button onclick="runScript('${name}',true)">🔍 干跑</button>
+      </div></div>`;
+    wrap.appendChild(det);
+  });
+}
+async function runScript(name,dry){
+  const params={};
+  SCRIPTS[name].fields.forEach(f=>{
+    const v=$("sc-"+name+"-"+f.k).value.trim();
+    if(v)params[f.k]=v;
+  });
+  if(dry)params.dry_run=true;
+  const r=await api("/api/scripts",{name,params});
+  log(r.output||"(无输出)",r.code===0?"":"err",$("log-sys"));
+  toast(name+(dry?" 干跑完成":" 执行完成"));
+}
+
+/* ---- 接入点 ---- */
+function buildAdapters(){
+  $("adapter-table").innerHTML=ADAPTERS.names.map(a=>`<tr><td>${a}</td><td>已注册</td></tr>`).join("");
+}
+
+/* ---- 初始化 ---- */
+async function loadConfig(){
+  const r=await api("/api/config");
+  if(r.ok)fillForm(r.config);
 }
 async function loadAdapters(){
-  const r=await api("/api/adapter-paths");
-  if(!r.ok) return;
-  $("adapter-table").innerHTML = r.adapters.map(a=>`<tr><td>${a.agent}</td><td>${a.path}</td></tr>`).join("");
+  const r=await api("/api/adapters");
+  if(r.ok){ADAPTERS=r;buildAdapters();buildScripts();}
 }
-
-// 事件
-Object.entries(CMD_BTNS).forEach(([id,cmd])=>{
-  $(id).addEventListener("click",()=>runCmd(cmd));
-});
-$("b-save").addEventListener("click",saveConfig);
-$("b-reload").addEventListener("click",async()=>{ clearLog(); await loadConfig(); });
-
-// 初始化
-$("cfg-path").textContent="config/cpa-config.yaml";
-loadConfig(); loadAdapters();
+async function loadVersion(){
+  const r=await api("/api/version");
+  if(r.ok){$("ver").textContent=r.cpa_sync||"?";$("ver-adapters").textContent=r.adapters+" adapter";}
+}
+loadConfig();loadAdapters();loadVersion();
 </script>
 </body>
 </html>
