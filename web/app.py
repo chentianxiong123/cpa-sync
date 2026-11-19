@@ -114,6 +114,31 @@ def get_adapters_info() -> dict:
     }
 
 
+def get_models() -> dict:
+    """拉取 CPA 实际模型列表 + 每个模型的当前覆盖（model_overrides 驼峰字段）。"""
+    from core.config import SyncConfig
+    from core.cpa_client import CPAClient
+
+    cfg = SyncConfig.load(CONFIG_PATH)
+    client = CPAClient(cfg.cpa.base_url, cfg.cpa.api_key)
+    try:
+        models = client.list_models()
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": str(e), "models": [], "cpa": {}}
+    ovs = cfg.cpa.model_overrides or {}
+    return {
+        "ok": True,
+        "cpa": {
+            "context_window": cfg.cpa.context_window,
+            "max_tokens": cfg.cpa.max_tokens,
+            "auto_compact_token_limit": cfg.cpa.auto_compact_token_limit,
+            "default_input_modes": cfg.cpa.default_input_modes,
+            "image_models": cfg.cpa.image_models,
+        },
+        "models": [{"id": m.id, "override": ovs.get(m.id, {}) or {}} for m in models],
+    }
+
+
 def get_version() -> dict:
     import re
     ver = "?"
@@ -156,6 +181,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": False, "error": str(e)}, 500)
         if p == "/api/adapters":
             return self._json({"ok": True, **get_adapters_info()})
+        if p == "/api/models":
+            return self._json(get_models())
         if p == "/api/version":
             return self._json({"ok": True, **get_version()})
         self._json({"ok": False, "error": "not found"}, 404)

@@ -109,51 +109,44 @@
     </div></div>
   </section>
 
-  <!-- ② 模型策略 -->
+  <!-- ② 模型属性：全局默认 ⊕ 模型级覆盖 -->
   <section class="card">
-    <div class="ch"><span class="n">②</span>模型策略 <span class="sub">选哪些模型 · 统一上下文 · 同步策略</span></div>
+    <div class="ch"><span class="n">②</span>模型属性 <span class="sub">全局默认 ⊕ 模型级覆盖 · 识图/上下文/思考/输出</span>
+      <div class="spacer"></div><button class="ghost" onclick="loadModels()">↻ 刷新模型</button></div>
     <div class="body">
-      <div class="row">
-        <div><label>上下文窗口</label><input type="number" id="context_window" step="1024"></div>
-        <div><label>最大输出</label><input type="number" id="max_tokens" step="1024"></div>
+      <div class="row3">
+        <div><label>全局上下文窗口</label><input type="number" id="context_window" step="1024"></div>
+        <div><label>全局最大输出</label><input type="number" id="max_tokens" step="1024"></div>
+        <div><label>codex 自动压缩阈值</label><input type="number" id="auto_compact" step="1024"></div>
       </div>
-      <label>codex 自动压缩阈值</label><input type="number" id="auto_compact" step="1024">
       <div class="row">
-        <div><label>模型白名单（逗号分隔，空=动态扫）</label><input type="text" id="include_models" placeholder="留空 = 扫 CPA 全部"><div class="hint">支持通配符 *.flash</div></div>
-        <div><label>模型黑名单（逗号分隔）</label><input type="text" id="exclude_models" placeholder="如 *.preview"></div>
+        <div><label>全局默认 input（兜底）</label>
+          <select id="default_input_modes">
+            <option value="text">text（纯文本）</option>
+            <option value="text,image">text,image（默认识图）</option>
+          </select></div>
+        <div><label>image_models 识图通配（逗号，命中叠加 image）</label><input type="text" id="image_models" placeholder="如 * 或 sensenova-*"></div>
+      </div>
+      <div class="row">
+        <div><label>模型白名单（逗号，空=全部）</label><input type="text" id="include_models" placeholder="留空 = 扫 CPA 全部"></div>
+        <div><label>模型黑名单（逗号）</label><input type="text" id="exclude_models" placeholder="如 *.preview"></div>
       </div>
       <label>同步策略</label>
       <select id="strategy">
         <option value="replace">replace — 全盘对齐 CPA（清幽灵）</option>
         <option value="merge">merge — 只增不删（保留下游额外模型）</option>
       </select>
+      <label style="margin-top:16px">模型级覆盖（CPA 实际模型 · 空=用全局默认）</label>
+      <div class="hint" id="models-hint">加载模型…</div>
+      <table><thead><tr><th>模型</th><th style="width:130px">input</th><th style="width:120px">contextWindow</th><th style="width:110px">maxTokens</th><th style="width:100px">reasoning</th><th style="width:56px"></th></tr></thead>
+      <tbody id="models-tbody"></tbody></table>
+      <div class="hint">input=识图 · contextWindow/maxTokens=上下文/输出 · reasoning=思考模式；填=覆盖全局，空=用全局默认</div>
     </div>
   </section>
 
-  <!-- ③ 识图能力 -->
-  <section class="card">
-    <div class="ch"><span class="n">③</span>识图能力 <span class="sub">三层优先级 · 自上而下</span></div>
-    <div class="body">
-      <div class="row">
-        <div><label>① default_input_modes（全局兜底）</label>
-          <select id="default_input_modes">
-            <option value="text">text（纯文本）</option>
-            <option value="text,image">text,image（默认识图）</option>
-          </select></div>
-        <div><label>② image_models（通配符，命中叠加 image；逗号分隔）</label>
-          <input type="text" id="image_models" placeholder="如 * 或 sensenova-*, gemini-*"></div>
-      </div>
-      <label>③ model_overrides（模型级覆盖，最高优先级）</label>
-      <table><thead><tr><th>模型名</th><th style="width:150px">input</th><th style="width:100px">reasoning</th><th style="width:110px">context</th><th style="width:110px">max_tokens</th><th style="width:36px"></th></tr></thead>
-      <tbody id="ov-tbody"></tbody></table>
-      <button class="addrow" onclick="addOverride()">＋ 添加模型覆盖</button>
-      <div class="hint">模型名 → {input, reasoning, context_window, max_tokens}，优先级高于全局</div>
-    </div>
-  </section>
-
-  <!-- ④ 机器拓扑 -->
+  <!-- ③ 机器拓扑 -->
   <section class="card" id="card-topo">
-    <div class="ch"><span class="n">④</span>机器拓扑 <span class="sub">改到哪 · 仅中心模式（SSH 下发需要）</span></div>
+    <div class="ch"><span class="n">③</span>机器拓扑 <span class="sub">改到哪 · 仅中心模式（SSH 下发需要）</span></div>
     <div class="body">
       <label>主机注册表 hosts</label>
       <table><thead><tr><th style="width:120px">ssh 别名</th><th style="width:110px">平台</th><th style="width:36px"></th></tr></thead>
@@ -169,7 +162,7 @@
 
   <!-- ⑤ 同步与状态 -->
   <section class="card">
-    <div class="ch"><span class="n">⑤</span>同步与状态 <span class="sub" id="sync-mode-label">中心模式 · SSH 下发</span>
+    <div class="ch"><span class="n">④</span>同步与状态 <span class="sub" id="sync-mode-label">中心模式 · SSH 下发</span>
       <div class="spacer"></div><span class="cnt" id="sync-hint"></span></div>
     <div class="body">
       <div class="btns" id="sync-btns"></div>
@@ -181,7 +174,7 @@
 
   <!-- ⑥ 诊断 -->
   <section class="card">
-    <div class="ch"><span class="n">⑥</span>诊断 <span class="sub">改得怎么样 · 连接/现状/模型对比 · 接入点</span></div>
+    <div class="ch"><span class="n">⑤</span>诊断 <span class="sub">改得怎么样 · 连接/现状/模型对比 · 接入点</span></div>
     <div class="body">
       <div class="btns" id="diag-btns"></div>
       <div class="log" id="log-diag"><span class="t">— 诊断输出。</span></div>
@@ -192,7 +185,7 @@
 
   <!-- ⑦ 维护脚本 -->
   <section class="card">
-    <div class="ch"><span class="n">⑦</span>维护脚本 <span class="sub">一次性动作 · 屏蔽下游自带 provider/模型</span></div>
+    <div class="ch"><span class="n">⑥</span>维护脚本 <span class="sub">一次性动作 · 屏蔽下游自带 provider/模型</span></div>
     <div class="body">
       <div id="scripts-wrap"></div>
       <div class="log" id="log-scripts"></div>
@@ -243,7 +236,6 @@ function fillForm(cfg){
   $("strategy").value=cfg.strategy||"replace";
   $("default_input_modes").value=(cpa.default_input_modes||["text"]).join(",");
   $("image_models").value=(cpa.image_models||[]).join(", ");
-  buildOverrides(cpa.model_overrides||{});
   buildTargets(cfg.targets||[]);
   buildHosts(cfg.hosts||{});
   buildInstances(cfg.adapter_instances||{});
@@ -259,7 +251,7 @@ function readForm(){
   cpa.exclude_models=$("exclude_models").value.split(",").map(s=>s.trim()).filter(Boolean);
   cpa.default_input_modes=$("default_input_modes").value.split(",");
   cpa.image_models=$("image_models").value.split(",").map(s=>s.trim()).filter(Boolean);
-  cpa.model_overrides=readOverrides();
+  cpa.model_overrides=readModelOverrides();
   CONFIG.strategy=$("strategy").value;
   CONFIG.targets=[...document.querySelectorAll("#targets input:checked")].map(i=>i.value);
   CONFIG.hosts=readHosts();
@@ -356,36 +348,41 @@ function readInstances(){
   return out;
 }
 
-/* ---- 模型级覆盖表格 ---- */
-function buildOverrides(ov){
-  const tb=$("ov-tbody");tb.innerHTML="";
-  Object.entries(ov||{}).forEach(([m,o])=>tb.appendChild(ovRow(m,o)));
+/* ---- 模型级覆盖（CPA 模型表，驼峰字段） ---- */
+async function loadModels(){
+  $("models-hint").textContent="加载模型…";
+  const r=await api("/api/models");
+  if(!r.ok){$("models-hint").textContent="⚠ "+(r.error||"连接失败");return;}
+  $("models-hint").textContent=r.models.length+" 个模型（CPA 实际暴露）";
+  const tb=$("models-tbody");tb.innerHTML="";
+  r.models.forEach(m=>tb.appendChild(modelRow(m.id,m.override||{})));
 }
-function ovRow(m,o){
-  o=o||{};
-  const input=(o.input||[]).join(",");
+function modelRow(id,ov){
+  const input=(ov.input||[]).join(",");
+  const inputSel=input==="text"?"text":input==="text,image"?"text,image":"";
+  const reason=ov.reasoning===true?"on":ov.reasoning===false?"off":"";
   const tr=document.createElement("tr");
-  tr.innerHTML=`<td><input class="mini" data-k="model" value="${m}"></td>
-    <td><select class="mini" data-k="input"><option value="">—</option><option ${input==="text"?"selected":""}>text</option><option ${input==="text,image"?"selected":""}>text,image</option></select></td>
-    <td><select class="mini" data-k="reasoning"><option value="">—</option><option ${o.reasoning?"selected":""} value="true">on</option></select></td>
-    <td><input class="mini" data-k="context" value="${o.context_window||""}" placeholder="全局"></td>
-    <td><input class="mini" data-k="max" value="${o.max_tokens||""}" placeholder="全局"></td>
-    <td><button class="del" onclick="this.closest('tr').remove()">×</button></td>`;
+  tr.innerHTML=`<td><span style="font-family:var(--mono);font-size:12px">${id}</span></td>
+    <td><select class="mini" data-k="input"><option value="">默认</option><option ${inputSel==="text"?"selected":""}>text</option><option ${inputSel==="text,image"?"selected":""}>text,image</option></select></td>
+    <td><input class="mini" data-k="context" value="${ov.contextWindow||""}" placeholder="全局"></td>
+    <td><input class="mini" data-k="max" value="${ov.maxTokens||""}" placeholder="全局"></td>
+    <td><select class="mini" data-k="reasoning"><option value="">默认</option><option ${reason==="on"?"selected":""} value="on">on</option><option ${reason==="off"?"selected":""} value="off">off</option></select></td>
+    <td><button class="del" title="重置为默认" onclick="resetRow(this)">↺</button></td>`;
   return tr;
 }
-function addOverride(){ $("ov-tbody").appendChild(ovRow("",{})); }
-function readOverrides(){
+function resetRow(btn){btn.closest("tr").querySelectorAll("select,input").forEach(el=>el.value="");}
+function readModelOverrides(){
   const out={};
-  $("ov-tbody").querySelectorAll("tr").forEach(tr=>{
+  document.querySelectorAll("#models-tbody tr").forEach(tr=>{
     const g=id=>tr.querySelector(`[data-k="${id}"]`).value;
-    const model=g("model").trim();
+    const model=tr.querySelector("td:first-child").textContent.trim();
     if(!model)return;
     const o={};
-    const input=g("input");if(input)o.input=input.split(",");
-    const reason=g("reasoning");if(reason)o.reasoning=reason;
-    const ctx=g("context");if(ctx)o.context_window=parseInt(ctx);
-    const mx=g("max");if(mx)o.max_tokens=parseInt(mx);
-    out[model]=o;
+    const inp=g("input");if(inp)o.input=inp.split(",");
+    const ctx=g("context");if(ctx)o.contextWindow=parseInt(ctx);
+    const mx=g("max");if(mx)o.maxTokens=parseInt(mx);
+    const r=g("reasoning");if(r)o.reasoning=(r==="on");
+    if(Object.keys(o).length)out[model]=o;
   });
   return out;
 }
@@ -446,7 +443,7 @@ async function loadVersion(){
   if(r.ok){$("ver").textContent=r.cpa_sync||"?";$("ver-adapters").textContent=r.adapters+" adapter";}
 }
 setMode("central");
-loadConfig();loadAdapters();loadVersion();
+loadConfig();loadAdapters();loadVersion();loadModels();
 </script>
 </body>
 </html>
