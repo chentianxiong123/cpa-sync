@@ -111,18 +111,19 @@ strategy: replace            # replace = 全盘对齐，不留旧模型
 
 ## 目录
 
-```
 cpa-sync/
 ├── cpa-sync              # CLI 入口（中心模式）
 ├── agent-sync            # CLI 入口（客户端模式，无 SSH）
 ├── agent-sync.sh/.ps1    # 客户端启动器（macOS/Linux / Windows）
+├── cpa-sync-web          # Web 控制面板启动器（venv python）
+├── cpa-sync-nginx        # nginx 网关安装器（渲染 gateway.yaml → /etc/nginx/conf.d）
 ├── core/                 # ir / cpa_client / config / remote
 ├── adapters/             # base + pi/opencode/claude/codex/omp/dsh/picoclaw/crush/openclaw/hermes
-├── scripts/              # 一次性/辅助脚本（如 omp_disable_providers.py 屏蔽 omp 自带 provider）
+├── web/                  # Web 控制面板（app.py 面板 + nginx.conf 模板 + static/）
+├── scripts/              # 辅助脚本（omp/picoclaw 屏蔽自带 + render_gateway 渲染网关）
 ├── docs/                 # 研究/设计笔记（如 omp 屏蔽自带 provider 机制）
-├── config/cpa-config.yaml# 中央配置（中心模式）
+├── config/               # cpa-config.yaml 中央配置 + gateway.yaml 网关配置（真实值，不进仓库）
 └── tests/                # 单元测试
-```
 
 ## 开发
 
@@ -131,6 +132,25 @@ python3 -m pytest tests/    # 跑测试
 ```
 
 新 adapter：继承 `adapters.base.Adapter`，实现 `load_current / render / write`，注册到 `adapters/__init__.py`。
+
+## Web 控制面板 + 网关（nginx 数据面反代）
+
+**双端口、可选模式**（`config/gateway.yaml`，上游数量可配，不写死）：
+
+| 端口（默认） | 进程 | 职责 | 谁连 |
+|---|---|---|---|
+| `17834` | Python（`web/app.py`） | 静态页 + 配置 API（管理面） | 浏览器 |
+| `8380` | nginx | 纯反代聚合 CPA（数据面） | agent |
+
+- **可选模式**：`config/gateway.yaml` 的 `upstreams` 可 1~N 个 CPA——1 个=纯转发；2+ 个=聚合+故障切换（round-robin，一台挂了自动切下一台）。
+- **无前后端分离**：面板由 Python 自己发静态页 + 管配置；nginx 只做高性能反代（不碰静态、不碰配置）。
+- 启动：
+  ```bash
+  .venv/bin/python web/app.py   # 面板（默认 0.0.0.0:17834）
+  ./cpa-sync-nginx install      # 渲染 gateway.yaml → /etc/nginx/conf.d/cpa-sync.conf → reload
+  ```
+- 配置：`config/gateway.yaml`（真实值，不进仓库）；模板 `config/gateway.yaml.example`；渲染入口 `scripts/render_gateway.py`。
+
 
 ## GUI（PySide6）
 

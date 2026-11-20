@@ -1,0 +1,16 @@
+# 网关配置 —— 可选模式（不写死，按需改）
+# upstreams 可 1~N 个 CPA：
+#   1 个 = 纯转发（单 CPA）
+#   2+ 个 = 聚合 + 故障切换（round-robin，一台挂了自动切下一台）
+# 双端口模式（默认）：
+#   listen      → nginx 反代端口（agent 连这里）
+#   panel_port  → Python 控制面板端口（浏览器连这里，Python 自己发页 + 配置 API）
+gateway:
+  listen: 8380            # nginx 数据面反代端口
+  panel_port: 17834       # Python 控制面板端口
+  proxy_read_timeout: 120 # 上游响应超时（秒）
+  upstreams:              # CPA 列表，可 1~N 个
+    - host: 192.168.31.213
+      port: 8317
+    - host: 192.168.31.253
+      port: 8317

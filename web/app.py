@@ -36,6 +36,7 @@ except ImportError:  # pragma: no cover
     yaml = None
 
 CONFIG_PATH = str(ROOT / "config" / "cpa-config.yaml")
+INDEX_PATH = ROOT / "web" / "static" / "index.html"
 VENV_PY = str(ROOT / ".venv" / "bin" / "python")
 
 # 中心 / 客户端 命令集合
@@ -170,8 +171,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         p = self.path.split("?")[0]
         if p == "/":
-            # API-only：静态页面由 nginx 直接提供（web/nginx.conf）
-            return self._json({"ok": True, "service": "cpa-sync api", "note": "静态由 nginx 提供"})
+            # 单进程面板：静态页由 Python 自己发（无前后端分离、无 nginx）
+            try:
+                return self._send(200, INDEX_PATH.read_bytes(), "text/html; charset=utf-8")
+            except OSError as e:  # noqa: BLE001
+                return self._json({"ok": False, "error": str(e)}, 500)
         if p == "/api/config":
             try:
                 with open(CONFIG_PATH, encoding="utf-8") as f:
@@ -229,8 +233,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> int:
     p = argparse.ArgumentParser(description="cpa-sync Web 控制面板")
-    p.add_argument("--host", default="127.0.0.1")
-    p.add_argument("--port", type=int, default=17835)
+    p.add_argument("--host", default="0.0.0.0")
+    p.add_argument("--port", type=int, default=17834)
     a = p.parse_args()
     print(f"cpa-sync Web 控制面板 → http://{a.host}:{a.port}")
     ThreadingHTTPServer((a.host, a.port), Handler).serve_forever()
