@@ -136,6 +136,15 @@
         <button onclick="nodeMgr('oauth')">🔐 OAuth</button>
       </div>
       <div class="log" id="log-mgr" style="min-height:90px"><span class="t">— 选择管理面功能查看。</span></div>
+      <div class="row" style="margin-top:12px">
+        <div><label>目标节点</label><select id="mgmt-host"></select></div>
+        <div><label>删除凭据文件名</label><input type="text" id="cred-del" placeholder="如 codex.json"></div>
+        <div><label>删除插件 id</label><input type="text" id="plugin-del" placeholder="如 some-plugin"></div>
+      </div>
+      <div class="btns" style="margin-top:8px">
+        <button onclick="nodeDel('cred')">🗑 删凭据</button>
+        <button onclick="nodeDel('plugin')">🗑 删插件</button>
+      </div>
     </div>
   </section>
 
@@ -444,6 +453,7 @@ async function loadNodes(){
   const hosts=r.nodes.map(n=>n.host);
   fillSelect($("sync-source"),hosts,hosts[0]);
   fillSelect($("sync-target"),hosts,hosts[1]||hosts[0]);
+  fillSelect($("mgmt-host"),hosts,hosts[1]||hosts[0]);
   log("✓ "+r.nodes.length+" 个节点状态已刷新","ok",$("log-nodes"));
 }
 function fillSelect(el,items,sel){el.innerHTML=items.map(h=>`<option ${h===sel?"selected":""}>${h}</option>`).join("");}
@@ -483,6 +493,16 @@ async function nodeMgr(type){
     else{txt+="✗ "+(n.error||n.data||"");}
   });
   log(txt||"(空)",null,$("log-mgr"));
+}
+
+async function nodeDel(type){
+  const host=$("mgmt-host").value;
+  const key=type==="cred"?$("cred-del").value.trim():$("plugin-del").value.trim();
+  if(!key){log("请输入"+(type==="cred"?"文件名":"插件 id"),"err",$("log-mgr"));return;}
+  if(!confirm("确认从 "+host+" 删除"+(type==="cred"?"凭据":"插件")+"「"+key+"」？"))return;
+  const r=await api("/api/nodes/"+(type==="cred"?"cred-delete":"plugin-delete"),{host,name:key,id:key});
+  log(r.ok?"✓ 已删除":"✗ "+(r.error||"HTTP "+r.status+" "+JSON.stringify(r.resp)),r.ok?"":"err",$("log-mgr"));
+  nodeMgr(type==="cred"?"credentials":"plugins");
 }
 
 /* ---- scripts ---- */

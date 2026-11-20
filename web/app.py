@@ -328,6 +328,32 @@ def node_oauth(payload: dict) -> dict:
     return {"ok": True, "nodes": out}
 
 
+def node_cred_delete(payload: dict) -> dict:
+    """删单个凭据文件（DELETE /credentials?name=<file>）。"""
+    host, name = payload.get("host"), payload.get("name")
+    cfg = _gateway_cfg()
+    nodes = {u["host"]: u for u in cfg["upstreams"]}
+    if host not in nodes:
+        return {"ok": False, "error": "host 不在 upstreams"}
+    if not name:
+        return {"ok": False, "error": "需 name 参数（凭据文件名）"}
+    st, resp = _mgmt(nodes[host], "credentials?name=" + str(name).replace("%", "%25"), method="DELETE")
+    return {"ok": st in (200, 204), "status": st, "resp": resp}
+
+
+def node_plugin_delete(payload: dict) -> dict:
+    """删插件（DELETE /plugins/<id>）。"""
+    host, pid = payload.get("host"), payload.get("id")
+    cfg = _gateway_cfg()
+    nodes = {u["host"]: u for u in cfg["upstreams"]}
+    if host not in nodes:
+        return {"ok": False, "error": "host 不在 upstreams"}
+    if not pid:
+        return {"ok": False, "error": "需 id 参数（插件 id）"}
+    st, resp = _mgmt(nodes[host], "plugins/" + str(pid), method="DELETE")
+    return {"ok": st in (200, 204), "status": st, "resp": resp}
+
+
 def get_models() -> dict:
     """拉取 CPA 实际模型列表 + 每个模型的当前覆盖（model_overrides 驼峰字段）。"""
     from core.config import SyncConfig
@@ -447,6 +473,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(node_logs(payload))
         if p == "/api/nodes/oauth":
             return self._json(node_oauth(payload))
+        if p == "/api/nodes/cred-delete":
+            return self._json(node_cred_delete(payload))
+        if p == "/api/nodes/plugin-delete":
+            return self._json(node_plugin_delete(payload))
         if p == "/api/run":
             mode = payload.get("mode", "central")
             cmd = payload.get("cmd", "")
