@@ -58,8 +58,6 @@ jobs:
         run: cargo install cargo-zigbuild --locked
 
       - name: 构建
-        env:
-          CARGO_TARGET_DIR: ${{ github.workspace }}/rs/target-${{ matrix.target }}
         run: |
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
             cargo zigbuild --release --target aarch64-unknown-linux-gnu
@@ -69,7 +67,9 @@ jobs:
 
       - name: 校验产物
         run: |
-          BIN=${{ github.workspace }}/rs/target-${{ matrix.target }}/release/cpa-sync
+          BIN=${{ github.workspace }}/rs/target/${{ matrix.target }}/release/cpa-sync
+          echo "-- 产物定位 --"
+          find . -type f -name cpa-sync -path '*release*' -exec ls -lh {} \;
           file "$BIN"
           ls -lh "$BIN"
           test -x "$BIN"
@@ -78,7 +78,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpa-sync-${{ matrix.target }}
-          path: rs/target-${{ matrix.target }}/release/cpa-sync
+          path: rs/target/${{ matrix.target }}/release/cpa-sync
           if-no-files-found: error
           compression-level: 1
 
@@ -96,22 +96,19 @@ jobs:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: 构建 aarch64（runner 原生架构）
-        env:
-          CARGO_TARGET_DIR: ${{ github.workspace }}/rs/target-aarch64
         run: cargo build --release --target aarch64-apple-darwin
 
       - name: 构建 x86_64（同一 SDK 交叉）
-        env:
-          CARGO_TARGET_DIR: ${{ github.workspace }}/rs/target-x86_64
         run: cargo build --release --target x86_64-apple-darwin
 
       - name: 合并成 universal
         run: |
           mkdir out
           T=${{ github.workspace }}/rs
+          find "$T" -type f -name cpa-sync -path '*release*' -exec ls -lh {} \;
           lipo -create -output out/cpa-sync \
-            "$T/target-aarch64/release/cpa-sync" \
-            "$T/target-x86_64/release/cpa-sync"
+            "$T/target/aarch64-apple-darwin/release/cpa-sync" \
+            "$T/target/x86_64-apple-darwin/release/cpa-sync"
           lipo -info out/cpa-sync
           file out/cpa-sync
           codesign --force --sign - out/cpa-sync   # ad-hoc 签名，防 Gatekeeper 拦
