@@ -109,6 +109,28 @@
     </div></div>
   </section>
 
+  <!-- CPA 节点管理 -->
+  <section class="card" id="card-nodes">
+    <div class="ch"><span class="n">🧭</span>CPA 节点 <span class="sub">状态监测 · 配置对比 · 多端同步 · 嗅探</span>
+      <div class="spacer"></div><button class="ghost" onclick="loadNodes()">↻ 刷新状态</button></div>
+    <div class="body">
+      <label style="margin-top:0">节点状态（健康 / 模型 / 版本 / 用量）</label>
+      <table><thead><tr><th>节点</th><th>状态</th><th>模型</th><th>版本</th><th>用量</th></tr></thead>
+      <tbody id="nodes-tbody"></tbody></table>
+      <div class="row" style="margin-top:12px">
+        <div><label>权威源（source）</label><select id="sync-source"></select></div>
+        <div><label>同步目标（target）</label><select id="sync-target"></select></div>
+      </div>
+      <div class="btns" style="margin-top:8px">
+        <button class="primary" onclick="syncNode()">🔁 权威源→目标 同步</button>
+        <button onclick="nodeDiff()">📊 配置对比 diff</button>
+        <button onclick="nodeRefresh()">🔄 刷新模型定义</button>
+        <button onclick="nodePing()">📡 嗅探(探活)</button>
+      </div>
+      <div class="log" id="log-nodes" style="margin-top:10px"><span class="t">— 节点操作输出。</span></div>
+    </div>
+  </section>
+
   <!-- ② 模型属性：全局默认 ⊕ 模型级覆盖 -->
   <section class="card">
     <div class="ch"><span class="n">②</span>模型属性 <span class="sub">全局默认 ⊕ 模型级覆盖 · 识图/上下文/思考/输出</span>
@@ -396,6 +418,53 @@ async function runCmd(cmd){
   log(r.output||"(无输出)",r.code===0?"":"err",$("log-sync"));
 }
 
+/* ---- CPA 节点管理 ---- */
+async function loadNodes(){
+  const r=await api("/api/nodes");
+  if(!r.ok){log("⚠ 节点状态拉取失败: "+(r.error||""),"err",$("log-nodes"));return;}
+  const tb=$("nodes-tbody");tb.innerHTML="";
+  r.nodes.forEach(n=>{
+    const tr=document.createElement("tr");
+    const usage=n.usage&&typeof n.usage==="object"?(Object.keys(n.usage).length+" 项"):"—";
+    tr.innerHTML=`<td><b>${n.host}:${n.port}</b></td>
+      <td>${n.ok?'<span style="color:var(--ok)">● 正常</span>':'<span style="color:var(--err)">● 异常</span>'}</td>
+      <td>${n.model_count??"—"} 个</td>
+      <td>${n.version&&n.version.version?n.version.version:"—"}</td>
+      <td>${usage}</td>`;
+    tb.appendChild(tr);
+  });
+  const hosts=r.nodes.map(n=>n.host);
+  fillSelect($("sync-source"),hosts,hosts[0]);
+  fillSelect($("sync-target"),hosts,hosts[1]||hosts[0]);
+  log("✓ "+r.nodes.length+" 个节点状态已刷新","ok",$("log-nodes"));
+}
+function fillSelect(el,items,sel){el.innerHTML=items.map(h=>`<option ${h===sel?"selected":""}>${h}</option>`).join("");}
+async function syncNode(){
+  const r=await api("/api/nodes/sync",{source:$("sync-source").value,target:$("sync-target").value});
+  log(r.ok?"✓ "+r.source+" → "+r.target+" 同步成功":"✗ "+(r.error||"同步失败"),r.ok?"":"err",$("log-nodes"));
+}
+async function nodeDiff(){
+  const r=await api("/api/nodes/diff",{});
+  if(!r.ok){log("✗ diff失败","err",$("log-nodes"));return;}
+  let txt="";
+  Object.entries(r.summary||{}).forEach(([h,s])=>{txt+=h+": providers "+Object.keys(s.providers).length+" 个\n";});
+  Object.entries(r.only||{}).forEach(([h,d])=>{txt+=h+" 差异: 仅"+h+"="+JSON.stringify(d.only)+" 缺="+JSON.stringify(d.missing)+"\n";});
+  log(txt||"(无差异)",null,$("log-nodes"));
+}
+async function nodeRefresh(){
+  const r=await api("/api/nodes/refresh",{});
+  if(r.ok){r.results.forEach(x=>log(x.host+": 刷新 "+x.status,"ok",$("log-nodes")));}
+  else log("✗ 刷新失败","err",$("log-nodes"));
+}
+async function nodePing(){
+  const r=await api("/api/nodes",{});
+  if(!r.ok)return;
+  for(const h of r.nodes.map(n=>n.host)){
+    const p=await api("/api/nodes/call",{host:h,mode:"ping"});
+    log(h+": "+(p.ok?"✅ 连通, "+p.models.length+" 模型":"❌ "+(p.error||"不通")),p.ok?"":"err",$("log-nodes"));
+  }
+}
+
 /* ---- scripts ---- */
 const SCRIPTS={
   omp_disable_providers:{title:"屏蔽 omp 自带 provider",desc:"写 disabledProviders 到 omp config.yml",fields:[{k:"config",label:"config.yml 路径",ph:"~/.omp/agent/config.yml"},{k:"keep",label:"保留 provider id",ph:"web"}]},
@@ -444,7 +513,7 @@ async function loadVersion(){
   if(r.ok){$("ver").textContent=r.cpa_sync||"?";$("ver-adapters").textContent=r.adapters+" adapter";}
 }
 setMode("central");
-loadConfig();loadAdapters();loadVersion();loadModels();
+loadConfig();loadAdapters();loadVersion();loadModels();loadNodes();
 </script>
 </body>
 </html>

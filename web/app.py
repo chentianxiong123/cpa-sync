@@ -114,6 +114,184 @@ def get_adapters_info() -> dict:
     }
 
 
+# ---------------- CPA 节点管理（多端 / 状态监测 / 嗅探） ----------------
+def _gateway_cfg() -> dict:
+    """读 config/gateway.yaml：listen / panel_port / management.key / upstreams。"""
+    try:
+        raw = yaml.safe_load(Path(ROOT / "config" / "gateway.yaml").read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001
+        raw = {}
+    g = raw.get("gateway", {}) or {}
+    mgmt = g.get("management", {}) or {}
+    return {
+        "listen": g.get("listen", 8380),
+        "panel_port": g.get("panel_port", 17834),
+        "key": mgmt.get("key", ""),
+        "upstreams": g.get("upstreams", []) or [],
+    }
+
+
+def _mgmt(node: dict, path: str, method: str = "GET", data=None, timeout: int = 10):
+    """调 CPA 管理 API /v8/management/<path>，Bearer key。返回 (status, payload)。"""
+    import urllib.error
+    import urllib.request
+
+    key = _gateway_cfg()["key"]
+    url = f"http://{node['host']}:{int(node.get('port', 8317))}/v8/management/{path}"
+    headers = {"Authorization": f"Bearer {key}", "Accept": "application/json"}
+    body = None
+    if data is not None:
+        body = json.dumps(data).encode()
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=body, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+        try:
+            return resp.status, json.loads(raw)
+        except Exception:  # noqa: BLE001
+            return resp.status, raw
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace")[:300]
+        try:
+            return e.code, json.loads(raw)
+        except Exception:  # noqa: BLE001
+            return e.code, raw
+    except Exception as e:  # noqa: BLE001
+        return 0, str(e)[:200]
+
+
+def _nodes_from_req(payload: dict) -> list[dict]:
+    """取指定 host 节点（列表），无则全部 upstreams。"""
+    cfg = _gateway_cfg()
+    wanted = [str(x).strip() for x in payload.get("hosts", []) if str(x).strip()]
+    if wanted:
+        return [u for u in cfg["upstreams"] if u["host"] in wanted]
+    return cfg["upstreams"]
+
+
+def get_nodes() -> dict:
+    """状态监测：每节点 健康/模型/版本/用量。"""
+    cfg = _gateway_cfg()
+    nodes = []
+    for u in cfg["upstreams"]:
+        node = {"host": u["host"], "port": int(u.get("port", 8317))}
+        try:
+            from core.cpa_client import CPAClient
+
+            ms = CPAClient(f"http://{node['host']}:{node['port']}/v1", cfg["key"], timeout=6).list_models()
+            node.update({"ok": True, "models": [m.id for m in ms], "model_count": len(ms)})
+        except Exception as e:  # noqa: BLE001
+            node.update({"ok": False, "error": str(e)[:120], "models": []})
+        st, v = _mgmt(node, "server/latest-version")
+        node["version"] = v if st == 200 else None
+        st, usage = _mgmt(node, "observability/usage/api-keys")
+        node["usage"] = usage if st == 200 else None
+        nodes.append(node)
+    return {"ok": True, "nodes": nodes}
+
+
+def node_config(payload: dict) -> dict:
+    """拉取节点完整 config（管理 API GET /config）。"""
+    nodes = _nodes_from_req(payload)
+    if not nodes:
+        return {"ok": False, "error": "无匹配节点"}
+    out = {}
+    for u in nodes:
+        st, cfg = _mgmt(u, "config")
+        out[u["host"]] = {"ok": st == 200, "config": cfg if st == 200 else None, "error": None if st == 200 else str(cfg)[:200]}
+    return {"ok": True, "configs": out}
+
+
+def node_diff(payload: dict) -> dict:
+    """多节点 config 对比（providers/上游差异）。"""
+    r = node_config(payload)
+    if not r.get("ok"):
+        return r
+    configs = r["configs"]
+    summary = {}
+    for host, info in configs.items():
+        cfg = info.get("config") or {}
+        provs = {}
+        for brand, items in (cfg.get("api-keys", {}) or {}).items():
+            if isinstance(items, list):
+                for p in items:
+                    if isinstance(p, dict) and p.get("name"):
+                        provs[p["name"]] = {
+                            "brand": brand,
+                            "base": p.get("base-url", ""),
+                            "disabled": bool(p.get("disabled", False)),
+                            "models": [m.get("name") for m in (p.get("models", []) or [])],
+                        }
+        summary[host] = {"ok": info["ok"], "providers": provs}
+    # 差异
+    hosts = list(summary)
+    only = {}
+    if len(hosts) >= 2:
+        base = hosts[0]
+        base_names = set(summary[base]["providers"])
+        for h in hosts[1:]:
+            names = set(summary[h]["providers"])
+            only[h] = {"only": sorted(names - base_names), "missing": sorted(base_names - names)}
+    return {"ok": True, "summary": summary, "only": only}
+
+
+def node_sync(payload: dict) -> dict:
+    """权威源同步：GET 源节点 config → PUT 目标节点（全量）。"""
+    src_host = payload.get("source")
+    dst_host = payload.get("target")
+    cfg = _gateway_cfg()
+    nodes = {u["host"]: u for u in cfg["upstreams"]}
+    if src_host not in nodes or dst_host not in nodes:
+        return {"ok": False, "error": f"源/目标不在 upstreams: {src_host}->{dst_host}"}
+    st, src_cfg = _mgmt(nodes[src_host], "config")
+    if st != 200:
+        return {"ok": False, "error": f"读源 {src_host} 失败: {str(src_cfg)[:150]}"}
+    st, resp = _mgmt(nodes[dst_host], "config", method="PUT", data=src_cfg)
+    if st not in (200, 204):
+        return {"ok": False, "error": f"写目标 {dst_host} 失败: {str(resp)[:150]}"}
+    # 目标刷新模型
+    _mgmt(nodes[dst_host], "routing/model-definitions/refresh", method="POST")
+    return {"ok": True, "source": src_host, "target": dst_host, "status": st}
+
+
+def node_call(payload: dict) -> dict:
+    """嗅探/探测：api-call 测试上游（或直连 /v1/models 探活）。"""
+    cfg = _gateway_cfg()
+    nodes = {u["host"]: u for u in cfg["upstreams"]}
+    host = payload.get("host")
+    if host not in nodes:
+        return {"ok": False, "error": "host 不在 upstreams"}
+    node = nodes[host]
+    if payload.get("mode") == "ping":
+        # 直连 OpenAI /v1/models 探活
+        try:
+            from core.cpa_client import CPAClient
+
+            ms = CPAClient(f"http://{host}:{int(node.get('port',8317))}/v1", cfg["key"], timeout=6).list_models()
+            return {"ok": True, "mode": "ping", "host": host, "models": [m.id for m in ms]}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "mode": "ping", "host": host, "error": str(e)[:150]}
+    # 管理面 api-call（透传，测上游 provider）
+    body = payload.get("body") or {}
+    st, resp = _mgmt(node, "requests/api-call", method="POST", data=body)
+    return {"ok": st in (200, 201), "host": host, "status": st, "resp": resp}
+
+
+def node_refresh(payload: dict) -> dict:
+    """刷新节点模型定义（多端模型一致性）。"""
+    cfg = _gateway_cfg()
+    nodes = {u["host"]: u for u in cfg["upstreams"]}
+    done = []
+    for host in payload.get("hosts") or list(nodes):
+        if host in nodes:
+            st, resp = _mgmt(nodes[host], "routing/model-definitions/refresh", method="POST")
+            if st == 404:  # 旧版端点回退
+                st, resp = _mgmt(nodes[host], "models/refresh", method="POST")
+            done.append({"host": host, "status": st, "resp": resp if st != 200 else "ok"})
+    return {"ok": True, "results": done}
+
+
 def get_models() -> dict:
     """拉取 CPA 实际模型列表 + 每个模型的当前覆盖（model_overrides 驼峰字段）。"""
     from core.config import SyncConfig
@@ -186,6 +364,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, **get_adapters_info()})
         if p == "/api/models":
             return self._json(get_models())
+        if p == "/api/nodes":
+            return self._json(get_nodes())
         if p == "/api/version":
             return self._json({"ok": True, **get_version()})
         self._json({"ok": False, "error": "not found"}, 404)
@@ -213,6 +393,16 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:  # noqa: BLE001
                 return self._json({"ok": False, "error": str(e)}, 500)
 
+        if p == "/api/nodes/config":
+            return self._json(node_config(payload))
+        if p == "/api/nodes/diff":
+            return self._json(node_diff(payload))
+        if p == "/api/nodes/sync":
+            return self._json(node_sync(payload))
+        if p == "/api/nodes/call":
+            return self._json(node_call(payload))
+        if p == "/api/nodes/refresh":
+            return self._json(node_refresh(payload))
         if p == "/api/run":
             mode = payload.get("mode", "central")
             cmd = payload.get("cmd", "")
