@@ -93,11 +93,20 @@
   </div>
   <div class="spacer"></div>
   <div class="hd-act">
+    <button onclick="togglePanelSec()">🔒 面板安全</button>
     <button onclick="saveConfig()">💾 保存配置</button>
     <button onclick="reloadConfig()">↺ 重读</button>
     <span class="ver">v<b id="ver">…</b> · <span id="ver-adapters"></span></span>
   </div>
 </header>
+
+<div id="panel-sec" class="hide" style="max-width:1000px;margin:10px auto 0;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px">
+  <div class="row3">
+    <div><label>面板访问密钥（空=不认证；设后 /api/* 需 X-Panel-Key）</label><input type="password" id="panel-key" placeholder="空 = 不认证"></div>
+    <div><label>绑定地址</label><select id="panel-bind"><option value="127.0.0.1">仅本机</option><option value="0.0.0.0">允许远程</option></select></div>
+    <div><label>&nbsp;</label><button class="primary" onclick="savePanelSec()">保存面板安全</button></div>
+  </div>
+</div>
 
 <main>
   <!-- ① CPA 网关 -->
@@ -134,6 +143,9 @@
         <button onclick="nodeMgr('plugins')">🧩 插件</button>
         <button onclick="nodeMgr('logs')">📜 日志</button>
         <button onclick="nodeMgr('oauth')">🔐 OAuth</button>
+        <button onclick="nodeLogClear()">🧹 清空日志</button>
+        <button onclick="nodeLogToggle(true)">📝 开日志</button>
+        <button onclick="nodeLogToggle(false)">🚫 关日志</button>
       </div>
       <div class="log" id="log-mgr" style="min-height:90px"><span class="t">— 选择管理面功能查看。</span></div>
       <div class="row" style="margin-top:12px">
@@ -242,7 +254,22 @@ let currentMode="central";
 
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200);}
 function setBusy(b){$("statusbar").classList.toggle("busy",b);$("status-text").textContent=b?"执行中…":"空闲";}
-async function api(path,body){const o=body!==undefined?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{};return (await fetch(path,o)).json();}
+function getKey(){return localStorage.getItem("panel_key")||"";}
+async function api(path,body){
+  const o={headers:{"X-Panel-Key":getKey()}};
+  if(body!==undefined){o.method="POST";o.headers["Content-Type"]="application/json";o.body=JSON.stringify(body);}
+  const r=await fetch(path,o);
+  const j=await r.json().catch(()=>({error:"bad resp"}));
+  if(j.error==="unauthorized"){toast("未认证：请在上方输入面板密钥");}
+  return j;
+}
+function togglePanelSec(){$("panel-sec").classList.toggle("hide");}
+async function savePanelSec(){
+  const auth=$("panel-key").value.trim();
+  await api("/api/panel/config",{auth_key:auth,bind:$("panel-bind").value});
+  if(auth)localStorage.setItem("panel_key",auth);
+  toast("面板安全已保存");
+}
 function log(text,cls,target){const el=target||$("log-sync");const d=document.createElement("div");if(cls)d.className=cls;d.textContent=text;el.appendChild(d);el.scrollTop=el.scrollHeight;}
 function clearLog(el){if(el)el.innerHTML="";}
 
@@ -503,6 +530,18 @@ async function nodeDel(type){
   const r=await api("/api/nodes/"+(type==="cred"?"cred-delete":"plugin-delete"),{host,name:key,id:key});
   log(r.ok?"✓ 已删除":"✗ "+(r.error||"HTTP "+r.status+" "+JSON.stringify(r.resp)),r.ok?"":"err",$("log-mgr"));
   nodeMgr(type==="cred"?"credentials":"plugins");
+}
+
+async function nodeLogClear(){
+  if(!confirm("确认清空所有节点日志？"))return;
+  const r=await api("/api/nodes/log-clear",{});
+  if(!r.ok){log("✗ 清空失败","err",$("log-mgr"));return;}
+  Object.entries(r.nodes).forEach(([h,n])=>log(h+": 清空 "+(n.ok?"✓":"✗ HTTP "+n.status),n.ok?"ok":"err",$("log-mgr")));
+}
+async function nodeLogToggle(on){
+  const r=await api("/api/nodes/log-toggle",{on});
+  if(!r.ok){log("✗ 开关失败","err",$("log-mgr"));return;}
+  Object.entries(r.nodes).forEach(([h,n])=>log(h+": 日志"+(n.on?"开":"关")+" "+(n.ok?"✓":"✗ HTTP "+n.status),n.ok?"ok":"err",$("log-mgr")));
 }
 
 /* ---- scripts ---- */

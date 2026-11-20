@@ -161,6 +161,36 @@ def _mgmt(node: dict, path: str, method: str = "GET", data=None, timeout: int = 
         return 0, str(e)[:200]
 
 
+def _panel_cfg() -> dict:
+    """读 gateway.yaml panel 段（面板自身安全）。"""
+    try:
+        raw = yaml.safe_load(Path(ROOT / "config" / "gateway.yaml").read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001
+        raw = {}
+    p = (raw.get("gateway", {}) or {}).get("panel", {}) or {}
+    return {"auth_key": p.get("auth_key", ""), "bind": p.get("bind", "127.0.0.1")}
+
+
+def get_panel_config() -> dict:
+    p = _panel_cfg()
+    return {"ok": True, "auth_set": bool(p["auth_key"]), "bind": p["bind"]}
+
+
+def set_panel_config(payload: dict) -> dict:
+    path = ROOT / "config" / "gateway.yaml"
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001
+        raw = {}
+    p = raw.setdefault("gateway", {}).setdefault("panel", {})
+    if "auth_key" in payload:
+        p["auth_key"] = str(payload.get("auth_key") or "")
+    if "bind" in payload:
+        p["bind"] = str(payload.get("bind") or "127.0.0.1")
+    path.write_text(yaml.safe_dump(raw, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    return {"ok": True}
+
+
 def _nodes_from_req(payload: dict) -> list[dict]:
     """取指定 host 节点（列表），无则全部 upstreams。"""
     cfg = _gateway_cfg()
@@ -354,6 +384,30 @@ def node_plugin_delete(payload: dict) -> dict:
     return {"ok": st in (200, 204), "status": st, "resp": resp}
 
 
+def node_log_clear(payload: dict) -> dict:
+    """清空节点日志（DELETE /observability/logs）。"""
+    out = {}
+    for u in _nodes_from_req(payload):
+        st, resp = _mgmt(u, "observability/logs", method="DELETE")
+        out[u["host"]] = {"ok": st in (200, 204), "status": st, "resp": resp if st != 200 else None}
+    return {"ok": True, "nodes": out}
+
+
+def node_log_toggle(payload: dict) -> dict:
+    """logging-to-file 开关（PUT config 改 observability.logs.logging-to-file）。"""
+    on = bool(payload.get("on", True))
+    out = {}
+    for u in _nodes_from_req(payload):
+        st, cfg = _mgmt(u, "config")
+        if st != 200:
+            out[u["host"]] = {"ok": False, "status": st, "error": "读 config 失败"}
+            continue
+        cfg.setdefault("observability", {}).setdefault("logs", {})["logging-to-file"] = on
+        st, resp = _mgmt(u, "config", method="PUT", data=cfg)
+        out[u["host"]] = {"ok": st in (200, 204), "status": st, "on": on, "resp": resp if st != 200 else None}
+    return {"ok": True, "nodes": out}
+
+
 def get_models() -> dict:
     """拉取 CPA 实际模型列表 + 每个模型的当前覆盖（model_overrides 驼峰字段）。"""
     from core.config import SyncConfig
@@ -396,6 +450,14 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):  # 静默访问日志
         pass
 
+    def _panel_auth(self) -> bool:
+        """面板认证：auth_key 空=不认证；否则需 X-Panel-Key / X-Management-Key。"""
+        key = _panel_cfg()["auth_key"]
+        if not key:
+            return True
+        provided = self.headers.get("X-Panel-Key") or self.headers.get("X-Management-Key") or ""
+        return provided == key
+
     def _send(self, code: int, body: bytes, ctype: str = "application/json; charset=utf-8"):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
@@ -410,6 +472,8 @@ class Handler(BaseHTTPRequestHandler):
     # ---- GET ----
     def do_GET(self):
         p = self.path.split("?")[0]
+        if p != "/" and not self._panel_auth():  # 静态页面壳可访问，API 需认证
+            return self._send(401, b'{"error":"unauthorized"}')
         if p == "/":
             # 单进程面板：静态页由 Python 自己发（无前后端分离、无 nginx）
             try:
@@ -428,6 +492,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(get_models())
         if p == "/api/nodes":
             return self._json(get_nodes())
+        if p == "/api/panel/config":
+            return self._json(get_panel_config())
         if p == "/api/version":
             return self._json({"ok": True, **get_version()})
         self._json({"ok": False, "error": "not found"}, 404)
@@ -435,6 +501,8 @@ class Handler(BaseHTTPRequestHandler):
     # ---- POST ----
     def do_POST(self):
         p = self.path.split("?")[0]
+        if not self._panel_auth():
+            return self._send(401, b'{"error":"unauthorized"}')
         try:
             ln = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(ln) if ln else b"{}"
@@ -477,6 +545,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(node_cred_delete(payload))
         if p == "/api/nodes/plugin-delete":
             return self._json(node_plugin_delete(payload))
+        if p == "/api/nodes/log-clear":
+            return self._json(node_log_clear(payload))
+        if p == "/api/nodes/log-toggle":
+            return self._json(node_log_toggle(payload))
+        if p == "/api/panel/config":
+            return self._json(set_panel_config(payload))
         if p == "/api/run":
             mode = payload.get("mode", "central")
             cmd = payload.get("cmd", "")
