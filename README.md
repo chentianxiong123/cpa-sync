@@ -152,6 +152,43 @@ python3 -m pytest tests/    # 跑测试
 - 配置：`config/gateway.yaml`（真实值，不进仓库）；模板 `config/gateway.yaml.example`；渲染入口 `scripts/render_gateway.py`。
 
 
+## 远程面板 + 面板安全
+
+**nginx 一体化**（1 个 nginx 进程，两个 server）：
+
+```
+nginx (1 进程 ~55MB)
+├─ :8380  → upstream 192.168.31.213 + 192.168.31.253（CPA 网关，故障切换）
+└─ :17835 → 127.0.0.1:17834（面板远程反代，局域网可访问）
+                    └─ app.py（本机自 serve，认证透传）
+```
+
+- **远程访问**：`http://192.168.31.204:17835`（局域网任一设备浏览器可开，完整面板功能）
+- **app.py 仍绑本机** `127.0.0.1:17834`——远程全靠 nginx 反代，面板本身不暴露到局域网
+
+### 开关（`config/gateway.yaml`，改后跑 `./cpa-sync-nginx install` 重载）
+
+| 配置 | 作用 | 默认 |
+|---|---|---|
+| `gateway.panel_proxy_port` | nginx 对外反代面板端口；**0 = 关掉远程面板**（只留本机 17834） | `17835` |
+| `gateway.panel.auth_key` | 面板访问密钥；设后 `/api/*` 需 `X-Panel-Key`（静态壳仍可开，用来输密钥） | `""`（不认证） |
+| `gateway.panel.bind` | app.py 绑定地址（`127.0.0.1` 本机 / `0.0.0.0` 直连远程，一般不改） | `127.0.0.1` |
+
+**认证语义**：`auth_key` 空 = 不认证；设了则无 key 访问 `/api/*` 返 **401**，带 key 返 200（面板顶部「🔒 面板安全」按钮设置，即时生效，不需重启）。
+
+## CPA 节点日志运维
+
+面板「🧭 CPA 节点」卡的管理面子区：
+
+| 操作 | 作用 | 备注 |
+|---|---|---|
+| 📜 日志 | 看 CPA 运行日志 | 需先开 logging-to-file |
+| 🧹 清空日志 | 清空两节点日志 | DELETE observability/logs |
+| 📝 开日志 / 🚫 关日志 | logging-to-file 开关 | 改节点 config，即时生效 |
+
+**logging-to-file** 默认关（日志接口返 400），面板一键开后即可看/清。
+
+
 ## GUI（PySide6）
 
 ```bash

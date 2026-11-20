@@ -9,6 +9,12 @@ gateway:
   listen: 8380            # nginx 数据面反代端口
   panel_port: 17834       # Python 控制面板端口
   proxy_read_timeout: 120 # 上游响应超时（秒）
+  panel_proxy_port: 17835 # nginx 对外反代面板端口（0=不启用远程面板）
+  management:
+    key: "CHANGE_ME"   # CPA 管理 API 密钥（/v8/management/* 的 secret-key，本地配置不进仓）
+  panel:
+    auth_key: ""      # 面板访问密钥（空=不认证；设后 /api/* 需 X-Panel-Key）
+    bind: "127.0.0.1" # 面板绑定（127.0.0.1 本机 / 0.0.0.0 允许远程）
   upstreams:              # CPA 列表，可 1~N 个
     - host: 192.168.31.213
       port: 8317
