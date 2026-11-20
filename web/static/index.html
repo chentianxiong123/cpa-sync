@@ -128,6 +128,14 @@
         <button onclick="nodePing()">📡 嗅探(探活)</button>
       </div>
       <div class="log" id="log-nodes" style="margin-top:10px"><span class="t">— 节点操作输出。</span></div>
+      <label style="margin-top:14px">管理面（凭据 / 插件 / 日志 / OAuth）</label>
+      <div class="btns" style="margin-bottom:8px">
+        <button onclick="nodeMgr('credentials')">🔑 凭据</button>
+        <button onclick="nodeMgr('plugins')">🧩 插件</button>
+        <button onclick="nodeMgr('logs')">📜 日志</button>
+        <button onclick="nodeMgr('oauth')">🔐 OAuth</button>
+      </div>
+      <div class="log" id="log-mgr" style="min-height:90px"><span class="t">— 选择管理面功能查看。</span></div>
     </div>
   </section>
 
@@ -463,6 +471,18 @@ async function nodePing(){
     const p=await api("/api/nodes/call",{host:h,mode:"ping"});
     log(h+": "+(p.ok?"✅ 连通, "+p.models.length+" 模型":"❌ "+(p.error||"不通")),p.ok?"":"err",$("log-nodes"));
   }
+}
+
+async function nodeMgr(type){
+  const r=await api("/api/nodes/"+type,{});
+  if(!r.ok){log("✗ "+type+" 失败","err",$("log-mgr"));return;}
+  let txt="";
+  Object.entries(r.nodes||{}).forEach(([h,n])=>{
+    txt+="\n═══ "+h+" (HTTP "+n.status+") ═══\n";
+    if(n.ok){txt+=JSON.stringify(n.data,null,1).slice(0,4000);}
+    else{txt+="✗ "+(n.error||n.data||"");}
+  });
+  log(txt||"(空)",null,$("log-mgr"));
 }
 
 /* ---- scripts ---- */

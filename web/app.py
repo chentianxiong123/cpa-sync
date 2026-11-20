@@ -292,6 +292,42 @@ def node_refresh(payload: dict) -> dict:
     return {"ok": True, "results": done}
 
 
+def node_credentials(payload: dict) -> dict:
+    """凭据列表（credentials）。"""
+    out = {}
+    for u in _nodes_from_req(payload):
+        st, data = _mgmt(u, "credentials")
+        out[u["host"]] = {"ok": st == 200, "status": st, "data": data if st == 200 else None}
+    return {"ok": True, "nodes": out}
+
+
+def node_plugins(payload: dict) -> dict:
+    """插件列表（plugins）。"""
+    out = {}
+    for u in _nodes_from_req(payload):
+        st, data = _mgmt(u, "plugins")
+        out[u["host"]] = {"ok": st == 200, "status": st, "data": data if st == 200 else None}
+    return {"ok": True, "nodes": out}
+
+
+def node_logs(payload: dict) -> dict:
+    """日志（observability/logs，需开 logging-to-file）。"""
+    out = {}
+    for u in _nodes_from_req(payload):
+        st, data = _mgmt(u, "observability/logs")
+        out[u["host"]] = {"ok": st == 200, "status": st, "data": data if st == 200 else None, "error": None if st == 200 else str(data)[:160]}
+    return {"ok": True, "nodes": out}
+
+
+def node_oauth(payload: dict) -> dict:
+    """OAuth 状态（oauth/status）。"""
+    out = {}
+    for u in _nodes_from_req(payload):
+        st, data = _mgmt(u, "oauth/status")
+        out[u["host"]] = {"ok": st == 200, "status": st, "data": data if st == 200 else None}
+    return {"ok": True, "nodes": out}
+
+
 def get_models() -> dict:
     """拉取 CPA 实际模型列表 + 每个模型的当前覆盖（model_overrides 驼峰字段）。"""
     from core.config import SyncConfig
@@ -403,6 +439,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(node_call(payload))
         if p == "/api/nodes/refresh":
             return self._json(node_refresh(payload))
+        if p == "/api/nodes/credentials":
+            return self._json(node_credentials(payload))
+        if p == "/api/nodes/plugins":
+            return self._json(node_plugins(payload))
+        if p == "/api/nodes/logs":
+            return self._json(node_logs(payload))
+        if p == "/api/nodes/oauth":
+            return self._json(node_oauth(payload))
         if p == "/api/run":
             mode = payload.get("mode", "central")
             cmd = payload.get("cmd", "")
