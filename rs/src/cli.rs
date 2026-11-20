@@ -10,6 +10,29 @@ fn config_path(explicit: String) -> Option<String> {
     if explicit.is_empty() { None } else { Some(explicit) }
 }
 
+/// 确定本次要处理哪些 agent（对照 Python 的 pick_adapters）。
+///
+/// 优先级：命令行显式指定 > 配置里的 targets > 全部 adapter。
+/// 这是同步范围的关键阀门：写错会把所有 agent 全量改写。
+pub fn pick_agents(cfg: &SyncConfig, explicit: &[String]) -> Vec<String> {
+    let all = adapters::available_names();
+    // 先 clone 成 owned，避免引用临时值的生命周期错误
+    let non_empty: Vec<String> = explicit.iter().filter(|s| !s.is_empty()).cloned().collect();
+    if !non_empty.is_empty() {
+        for n in &non_empty {
+            if !all.contains(n) {
+                eprintln!("未知 adapter: {}（可用: {}）", n, all.join(", "));
+                std::process::exit(2);
+            }
+        }
+        return non_empty;
+    }
+    if !cfg.targets.is_empty() {
+        return cfg.targets.iter().filter(|n| all.contains(n)).cloned().collect();
+    }
+    adapters::available_names()
+}
+
 /// 连 CPA 拉模型 + 构建目标 IR（对照 _pull_models + build_provider_ir）
 async fn pull_target(cfg: &SyncConfig) -> Result<(ProviderIR, usize), String> {
     let client = CPAClient::new(&cfg.cpa.base_url, &cfg.cpa.api_key, 10);
@@ -32,8 +55,8 @@ pub async fn check(cfg_path: &str) -> Value {
     };
     let mut diffs = Vec::new();
     let mut agents = 0usize;
-    for agent in adapters::available_names() {
-        let insts = adapters::factory::build(&cfg, &agent);
+    for agent in pick_agents(&cfg, &[String::new()]) {
+        let insts = adapters::factory::build(&cfg, agent.as_str());
         for (name, adapter) in insts {
             if adapter.diff(&None, &target).is_empty() { continue; }
             let cur = adapter.load_current();
@@ -66,9 +89,8 @@ pub async fn apply(cfg_path: &str, dry_run: bool, sync_only: &[String]) -> Value
     let mut results = Vec::new();
     let mut ok = 0usize;
     let mut fail = 0usize;
-    for agent in adapters::available_names() {
-        if !sync_only.is_empty() && !sync_only.contains(&agent) { continue; }
-        let insts = adapters::factory::build(&cfg, &agent);
+    for agent in pick_agents(&cfg, sync_only) {
+        let insts = adapters::factory::build(&cfg, agent.as_str());
         for (name, adapter) in insts {
             let cur = adapter.load_current();
             let diff_lines = adapter.diff(&cur, &target);
@@ -126,11 +148,10 @@ pub fn list(cfg_path: &str) -> Value {
         Err(e) => return json!({"ok": false, "error": e.to_string()}),
     };
     let mut out = Vec::new();
-    for agent in adapters::available_names() {
-        for (name, adapter) in adapters::factory::build(&cfg, &agent) {
+    for agent in pick_agents(&cfg, &[]) {
+        for (name, adapter) in adapters::factory::build(&cfg, agent.as_str()) {
             out.push(json!({"agent": adapter.name(), "instance": name}));
         }
-        let _ = &Rendered::Text(String::new());
     }
     json!({"ok": true, "instances": out})
 }
