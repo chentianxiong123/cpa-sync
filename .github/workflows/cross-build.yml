@@ -27,6 +27,9 @@ jobs:
   # ---------------- Linux ----------------
   linux:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rs
     strategy:
       fail-fast: false
       matrix:
@@ -75,13 +78,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpa-sync-${{ matrix.target }}
-          path: target-${{ matrix.target }}/release/cpa-sync
+          path: rs/target-${{ matrix.target }}/release/cpa-sync
           if-no-files-found: error
           compression-level: 1
 
   # ---------------- macOS ----------------
   macos:
     runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: rs
     steps:
       - uses: actions/checkout@v4
 
@@ -113,7 +119,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpa-sync-universal-apple
-          path: out/cpa-sync
+          path: rs/out/cpa-sync
           if-no-files-found: error
           compression-level: 1
 
