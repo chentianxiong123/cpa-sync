@@ -62,6 +62,13 @@ node_handler!(post_nodes_plugin_delete, api::node_plugin_delete);
 node_handler!(post_nodes_log_clear, api::node_log_clear);
 node_handler!(post_nodes_log_toggle, api::node_log_toggle);
 
+// POST /api/scripts：执行项目辅助脚本（白名单，探测 python3）
+async fn post_scripts(Json(p): Json<Value>) -> axum::Json<Value> {
+    let name = p.get("name").and_then(|v| v.as_str()).unwrap_or("");
+    let params = p.get("params").cloned().unwrap_or(Value::Null);
+    axum::Json(api::run_script(name, &params).await)
+}
+
 async fn post_panel_config(Json(p): Json<Value>) -> axum::Json<Value> { axum::Json(api::set_panel_config(&p)) }
 
 async fn post_run(Json(p): Json<Value>) -> axum::Json<Value> {
@@ -89,12 +96,21 @@ async fn post_run(Json(p): Json<Value>) -> axum::Json<Value> {
 async fn maybe_cli(args: &[String]) -> bool {
     let first = args.iter().find(|a| !a.starts_with('-'));
     let cmd = match first { Some(v) => v.as_str(), None => return false };
-    if !matches!(cmd, "check" | "models" | "list" | "apply") { return false; }
+    if !matches!(cmd, "check" | "models" | "list" | "apply" | "doctor" | "sync") { return false; }
     let cfg = args.iter().position(|a| a == "--config")
         .and_then(|i| args.get(i + 1)).cloned().unwrap_or_default();
     let out = if cmd == "check" { crate::cli::check(&cfg).await }
         else if cmd == "models" { crate::cli::models(&cfg).await }
         else if cmd == "apply" { crate::cli::apply(&cfg, false, &[]).await }
+        else if cmd == "doctor" { crate::cli::doctor(&cfg).await }
+        else if cmd == "sync" {
+            // 交互式 TUI 向导在 Rust 版由 web 面板承担；CLI sync 输出诊断+预览，执行用 apply
+            let doc = crate::cli::doctor(&cfg).await;
+            let chk = crate::cli::check(&cfg).await;
+            serde_json::json!({"ok": true,
+                "note": "Rust 版的交互式同步入口是 web 面板（无子命令启动）。CLI sync 给出诊断与预览，确认后请执行 apply。",
+                "doctor": doc, "preview": chk})
+        }
         else { crate::cli::list(&cfg) };
     println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
     true
@@ -125,6 +141,7 @@ async fn main() {
         .route("/api/nodes/log-clear", post(post_nodes_log_clear))
         .route("/api/nodes/log-toggle", post(post_nodes_log_toggle))
         .route("/api/run", post(post_run))
+        .route("/api/scripts", post(post_scripts))
         .fallback_service(ServeDir::new(root().join("web").join("static")))
         .with_state(state);
     let addr = format!("127.0.0.1:{}", api::gateway_cfg().panel_port);

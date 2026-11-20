@@ -180,3 +180,60 @@ pub async fn run_client(cmd: &str) -> (i32, String) {
 
 async fn cli_apply(_p: &str) -> Value { apply("", false, &[]).await }
 async fn cli_models(_p: &str) -> Value { models("").await }
+
+/// 对应 cpa-sync doctor：连接检查 + 白名单校验 + adapter 健康（纯读诊断）
+pub async fn doctor(cfg_path: &str) -> Value {
+    let cfg = match SyncConfig::load(config_path(cfg_path.to_string()).as_deref()) {
+        Ok(c) => c,
+        Err(e) => return json!({"ok": false, "error": e.to_string()}),
+    };
+    let mut checks: Vec<Value> = Vec::new();
+
+    // 1) CPA 连接检查
+    let (target, total) = match pull_target(&cfg).await {
+        Ok(v) => v,
+        Err(e) => {
+            checks.push(json!({"kind": "conn", "ok": false, "line": format!("✗ 连 CPA 失败: {}", e)}));
+            return json!({"ok": false, "checks": checks});
+        }
+    };
+    checks.push(json!({"kind": "conn", "ok": true,
+        "line": format!("✓ {} 可达，暴露 {} 个模型", cfg.cpa.base_url, total)}));
+
+    // 2) 模型白名单校验
+    let avail: Vec<&str> = target.models.iter().map(|m| m.id.as_str()).collect();
+    for mid in &cfg.cpa.include_models {
+        let ok = avail.contains(&mid.as_str())
+            || avail.iter().any(|a| !a.contains('/') && mid.ends_with(&format!("/{}", a)));
+        checks.push(json!({"kind": "whitelist", "ok": ok, "model": mid,
+            "line": format!("{} {}", if ok { "✓" } else { "⚠" }, mid)}));
+    }
+
+    // 3) adapter 健康（幽灵模型检测）
+    for agent in pick_agents(&cfg, &[]) {
+        let insts = adapters::factory::build(&cfg, agent.as_str());
+        for (name, adapter) in insts {
+            let cur = adapter.load_current();
+            match cur {
+                None => checks.push(json!({"kind": "adapter", "ok": true, "agent": agent,
+                    "line": format!("  {}: 未配置", name)})),
+                Some(c) => {
+                    let ghosts: Vec<&String> = c.models.iter()
+                        .filter(|m| !avail.contains(&m.id.as_str()))
+                        .map(|m| &m.id).collect();
+                    let ghost_s = ghosts.iter().map(|s| s.as_str())
+                        .collect::<Vec<_>>().join(", ");
+                    let line = format!("  {}: {}  models={}  {}",
+                        name, c.base_url, c.models.len(),
+                        if ghosts.is_empty() { String::new() } else {
+                            format!("⚠ 幽灵模型: {}", ghost_s)
+                        });
+                    checks.push(json!({"kind": "adapter", "ok": ghosts.is_empty(),
+                        "agent": agent, "ghosts": ghosts, "line": line}));
+                }
+            }
+        }
+    }
+    let bad = checks.iter().filter(|c| c.get("ok").and_then(|v| v.as_bool()) == Some(false)).count();
+    json!({"ok": true, "checks": checks, "summary": format!("共 {} 项检查，{} 项需注意", checks.len(), bad)})
+}

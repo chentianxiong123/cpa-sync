@@ -432,3 +432,50 @@ pub async fn run_client(name: &str) -> Value {
         _ => json!({"code": 2, "output": format!("未知客户端命令: {}", name)}),
     }
 }
+
+/// 执行 web 面板的辅助脚本（对照 web/app.py 的 run_script）。
+/// 白名单 + 探测 python3；仅此端点在运行时依赖 Python，Rust 核心不依赖。
+pub async fn run_script(name: &str, params: &Value) -> Value {
+    let scripts = [
+        ("omp_disable_providers", "scripts/omp_disable_providers.py"),
+        ("picoclaw_disable_builtin", "scripts/picoclaw_disable_builtin.py"),
+    ];
+    let rel = match scripts.iter().find(|(n, _)| *n == name) {
+        Some((_, p)) => *p,
+        None => return json!({"code": 2, "output": format!("未知脚本: {}", name)}),
+    };
+    let script = crate::core::config::project_root().join(rel);
+    if !script.exists() {
+        return json!({"code": 3, "output": format!("脚本不存在: {}", script.display())});
+    }
+    let py = ["python3", "python"].iter().find(|p| {
+        std::process::Command::new(p).arg("--version").output()
+            .map(|o| o.status.success()).unwrap_or(false)
+    });
+    let Some(py) = py else {
+        return json!({"code": 4,
+            "output": "需要 python3 来执行辅助脚本（Rust 核心不依赖 Python，此端点除外）"});
+    };
+    let mut cmd = std::process::Command::new(py);
+    cmd.arg(&script);
+    if let Some(obj) = params.as_object() {
+        for (k, v) in obj {
+            cmd.arg(format!("--{}", k.replace('_', "-")));
+            if v.is_boolean() {
+                if v.as_bool().unwrap_or(false) { cmd.arg("true"); }
+            } else if let Some(s) = v.as_str() {
+                if !s.is_empty() { cmd.arg(s); }
+            } else if let Some(n) = v.as_i64() {
+                cmd.arg(n.to_string());
+            }
+        }
+    }
+    match cmd.output() {
+        Ok(o) => {
+            let mut out = String::from_utf8_lossy(&o.stdout).to_string();
+            out.push_str(&String::from_utf8_lossy(&o.stderr));
+            json!({"code": o.status.code().unwrap_or(1), "output": out})
+        }
+        Err(e) => json!({"code": 1, "output": format!("✗ {}: {}", e.kind(), e)}),
+    }
+}

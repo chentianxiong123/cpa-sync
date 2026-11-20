@@ -6,9 +6,31 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+/// 项目根：crate 可能在子目录（如 rs/），config/scripts/web 在项目根。
+/// 探测顺序：环境变量 CPA_SYNC_ROOT > CARGO_MANIFEST_DIR 祖先链 >
+/// 可执行文件旁（分发形态：二进制与 config/scripts 同目录）> 回退 CARGO_MANIFEST_DIR。
 pub fn project_root() -> PathBuf {
-    let m = env!("CARGO_MANIFEST_DIR");
-    PathBuf::from(m)
+    if let Ok(p) = std::env::var("CPA_SYNC_ROOT") {
+        let pb = PathBuf::from(p);
+        if pb.exists() {
+            return pb;
+        }
+    }
+    let m = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut cands: Vec<PathBuf> = vec![m.clone()];
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            cands.push(dir.to_path_buf());
+        }
+    }
+    for c in cands {
+        for d in c.ancestors() {
+            if d.join("config").join("cpa-config.yaml").exists() || d.join("scripts").is_dir() {
+                return d.to_path_buf();
+            }
+        }
+    }
+    m
 }
 pub fn default_config_path() -> PathBuf {
     if let Ok(p) = std::env::var("CPA_SYNC_CONFIG") {
