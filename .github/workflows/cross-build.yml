@@ -59,7 +59,7 @@ jobs:
 
       - name: 构建
         env:
-          CARGO_TARGET_DIR: target-${{ matrix.target }}
+          CARGO_TARGET_DIR: ${{ github.workspace }}/rs/target-${{ matrix.target }}
         run: |
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
             cargo zigbuild --release --target aarch64-unknown-linux-gnu
@@ -69,7 +69,7 @@ jobs:
 
       - name: 校验产物
         run: |
-          BIN=target-${{ matrix.target }}/release/cpa-sync
+          BIN=${{ github.workspace }}/rs/target-${{ matrix.target }}/release/cpa-sync
           file "$BIN"
           ls -lh "$BIN"
           test -x "$BIN"
@@ -97,20 +97,21 @@ jobs:
 
       - name: 构建 aarch64（runner 原生架构）
         env:
-          CARGO_TARGET_DIR: target-aarch64
+          CARGO_TARGET_DIR: ${{ github.workspace }}/rs/target-aarch64
         run: cargo build --release --target aarch64-apple-darwin
 
       - name: 构建 x86_64（同一 SDK 交叉）
         env:
-          CARGO_TARGET_DIR: target-x86_64
+          CARGO_TARGET_DIR: ${{ github.workspace }}/rs/target-x86_64
         run: cargo build --release --target x86_64-apple-darwin
 
       - name: 合并成 universal
         run: |
           mkdir out
+          T=${{ github.workspace }}/rs
           lipo -create -output out/cpa-sync \
-            target-aarch64/release/cpa-sync \
-            target-x86_64/release/cpa-sync
+            "$T/target-aarch64/release/cpa-sync" \
+            "$T/target-x86_64/release/cpa-sync"
           lipo -info out/cpa-sync
           file out/cpa-sync
           codesign --force --sign - out/cpa-sync   # ad-hoc 签名，防 Gatekeeper 拦
