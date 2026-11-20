@@ -188,6 +188,25 @@ nginx (1 进程 ~55MB)
 
 **logging-to-file** 默认关（日志接口返 400），面板一键开后即可看/清。
 
+## nginx 调优（压 worker + 单进程）
+
+nginx 默认 `worker_processes auto` = **CPU 核数**（12 核→13 进程 69MB）。同步低频场景压到单进程：
+
+```nginx
+worker_processes 1;    # 1 个 worker 够（默认 auto=核数）
+master_process off;    # 单进程直接服务（无独立 worker）
+```
+
+| 配置 | nginx 进程 | 内存 |
+|---|---|---|
+| 默认 auto | 13 | 69MB |
+| worker_processes 1 | 2 | 11.6MB |
+| **+ master_process off** | **1** | **2.8MB** |
+
+- `./cpa-sync-nginx install` 已固化这两个指令并重启（无需手改）
+- 副作用：改配置必须 `stop/start`（reload 不生效）；单进程单点（崩了跑一次 install 回来）
+- 完整手册：桌面《nginx调优-压worker单进程.md》
+
 
 ## GUI（PySide6）
 
