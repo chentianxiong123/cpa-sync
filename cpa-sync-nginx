@@ -13,6 +13,11 @@ case "${1:-install}" in
     [ -x "$PY" ] || { echo "✗ 缺 .venv：python3 -m venv .venv && .venv/bin/pip install PyYAML" >&2; exit 1; }
     "$PY" "$ROOT/scripts/render_gateway.py" --output /tmp/cpa-nginx.conf
     sudo cp /tmp/cpa-nginx.conf "$DEST"
+    # 精简：同步低频场景 1 个 worker 够（nginx 默认 auto=CPU 核数，12 核→12 进程）
+    if ! grep -qE '^[[:space:]]*worker_processes[[:space:]]+1;' /etc/nginx/nginx.conf; then
+      sudo sed -i -E 's/^[[:space:]]*worker_processes[[:space:]]+.*;/worker_processes 1;/' /etc/nginx/nginx.conf
+      echo "  · worker_processes → 1（精简，1 个 worker）"
+    fi
     sudo nginx -t
     sudo nginx -s reload
     echo "✓ nginx 网关已安装并重载（上游见 config/gateway.yaml）"
