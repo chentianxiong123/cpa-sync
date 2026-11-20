@@ -27,10 +27,29 @@ def render(cfg: dict, template: str) -> str:
     lines = "\n".join(
         f"    server {u['host']}:{int(u.get('port', 8317))};" for u in ups
     )
+    # 面板反代（panel_proxy_port>0 才启用）
+    panel_port = int(gw.get("panel_port", 17834))
+    panel_proxy = int(gw.get("panel_proxy_port", 0))
+    if panel_proxy:
+        panel_block = f"""server {{
+    listen {panel_proxy};
+    server_name _;
+    location / {{
+        proxy_pass http://127.0.0.1:{panel_port};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 120s;
+    }}
+}}"""
+    else:
+        panel_block = "# (未启用面板反代 panel_proxy_port=0)"
     return (
         template.replace("__LISTEN__", str(listen))
         .replace("__UPSTREAMS__", lines)
         .replace("__READ_TIMEOUT__", str(timeout))
+        .replace("__PANEL_BLOCK__", panel_block)
     )
 
 
