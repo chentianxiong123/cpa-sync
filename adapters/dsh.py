@@ -47,7 +47,7 @@ class DshAdapter(Adapter):
             self.creds_path = os.environ.get("CPA_SYNC_DSH_CREDENTIALS", DSH_CREDENTIALS)
         self.path = path
         self.platform = platform
-        self.remote = RemoteIO(self.host, platform=self.platform)
+        self.remote = RemoteIO(self.host or None, platform=self.platform)
 
     def iter_instances(self) -> list[tuple[str, "DshAdapter"]]:
         """中央配置 adapter_instances 里 dsh 的接入点（每台机器一个）。
@@ -64,7 +64,7 @@ class DshAdapter(Adapter):
     # ---- 读取当前配置 ----
     def load_current(self) -> ProviderIR | None:
         raw = self.remote.read(self.path)
-        data = yaml.safe_load(raw)
+        data = yaml.safe_load(raw) or []  # 空文件（首次）-> 空列表，避免 None 不可迭代
         provider = self._find_cpa_provider(data)
         if provider is None:
             return None

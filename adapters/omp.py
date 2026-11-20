@@ -46,7 +46,7 @@ class OmpAdapter(Adapter):
                 path = os.environ.get("CPA_SYNC_OMP_PATH", OMP_MODELS)
         self.path = path
         self.platform = platform
-        self.remote = RemoteIO(self.host, platform=self.platform)
+        self.remote = RemoteIO(self.host or None, platform=self.platform)
 
     def iter_instances(self) -> list[tuple[str, "OmpAdapter"]]:
         """中央配置 adapter_instances 里 omp 的接入点（每台机器一个）。

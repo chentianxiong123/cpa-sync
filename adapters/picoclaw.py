@@ -34,7 +34,7 @@ class PicoclawAdapter(Adapter):
             path = os.environ.get("CPA_SYNC_PICOCLAW_PATH", DEFAULT_PATH)
         self.path = path
         self.platform = platform
-        self.remote = RemoteIO(self.host, platform=self.platform)
+        self.remote = RemoteIO(self.host or None, platform=self.platform)
 
     def iter_instances(self) -> list[tuple[str, "PicoclawAdapter"]]:
         instances = getattr(self.config, "adapter_instances", {}) or {}
