@@ -24,3 +24,6 @@ _forensics/
 # 发行产物
 dist/
 build/
+
+# 基准脚本产物
+/target/bench-result.json
