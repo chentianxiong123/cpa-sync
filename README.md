@@ -1,5 +1,8 @@
 # cpa-sync —— CPA 配置同步
 
+> **主线 = Rust**（`rs/`，CLI + Web 面板一体，`cpa-sync-rs`）。
+> Python 版已归档到 **`old/`**（保留作参考，不再维护/不再主线）。
+
 把 **CPA (cli-proxy-api)** 配置同步到所有 agent 应用。两套工具：
 
 - **`cpa-sync`（中心模式）**：在中心机跑，中央配置为唯一事实来源，一键下发到各接入机（ssh/scp）。
