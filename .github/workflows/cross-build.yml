@@ -99,10 +99,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 安装 osxcross + SDK（首次 ~9 分钟，SDK 来自 joseluisq/macosx-sdks）
-        uses: Timmmm/setup-osxcross@v2
+      - name: 安装 osxcross 构建依赖
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq clang cmake xz-utils wget build-essential
+
+      - name: 克隆 osxcross
+        run: git clone --depth 1 https://github.com/tpoechtrager/osxcross.git /tmp/osxcross
+
+      - name: 恢复 osxcross 编译缓存（target + SDK，命中则跳过 9 分钟编译）
+        uses: actions/cache@v4
         with:
-          osx-version: "12.3"
+          path: |
+            /tmp/osxcross/target
+            /tmp/osxcross/tarballs
+          key: osxcross-12.3-stable
+          restore-keys: osxcross-12.3-stable-
+
+      - name: 下载 macOS SDK（缓存未命中才下）
+        run: |
+          if [ ! -f /tmp/osxcross/tarballs/MacOSX12.3.sdk.tar.xz ]; then
+            mkdir -p /tmp/osxcross/tarballs
+            wget -q https://github.com/joseluisq/macosx-sdks/releases/download/12.3/MacOSX12.3.sdk.tar.xz -O /tmp/osxcross/tarballs/MacOSX12.3.sdk.tar.xz
+          fi
+
+      - name: 构建 osxcross（非交互，target 已存在则跳过）
+        run: |
+          if [ ! -x /tmp/osxcross/target/bin/o64-clang ]; then
+            cd /tmp/osxcross
+            BUILD_FLAVOR=stable UNATTENDED=1 ./build.sh
+          else
+            echo "osxcross 缓存命中，跳过编译"
+          fi
+
+      - name: 加入 PATH
+        run: echo "/tmp/osxcross/target/bin" >> "$GITHUB_PATH"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
