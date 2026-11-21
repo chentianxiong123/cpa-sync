@@ -1,11 +1,10 @@
-# 推送后自动交叉编译 4 个目标平台：
-#   linux x86_64 / linux arm64 / macos arm64 / macos x86_64（后两个合成 universal）
+# 交叉编译：linux x86_64/arm64 + macOS x86_64/arm64
 #
-# 交叉策略（不用 Docker，尽量贴近 runner 原生工具链）：
-#   - linux x86_64   : runner 原生 gcc（rusqlite bundled 要编译 sqlite C 源码）
-#   - linux arm64    : cargo-zigbuild（zig cc 自带 arm64 libc，无需装交叉工具链）
-#   - macos          : macos-latest 是 arm64，原生编 aarch64；
-#                      x86_64 用同一 SDK 交叉编，最后 lipo 成 universal
+# 设计（用户拍板）：
+#   - 编译全在 ubuntu-latest（免费无限）——linux 原生/zigbuild，macOS 用 osxcross
+#   - macos-latest 只做 ad-hoc 签名（500 分钟免费额度用一点点，不再全程编译）
+#   - macOS 交叉用 Timmmm/setup-osxcross@v2（SDK 来自 joseluisq/macosx-sdks，无需自备 SDK）
+#   - 全流程带 actions/cache（cargo registry + target），避免每次全量重编
 name: cross-build
 
 on:
@@ -24,7 +23,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # ---------------- Linux ----------------
+  # ---------------- Linux（原生 + zigbuild 交叉） ----------------
   linux:
     runs-on: ubuntu-latest
     defaults:
@@ -57,6 +56,17 @@ jobs:
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: cargo install cargo-zigbuild --locked
 
+      - name: cargo 缓存
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rs/target
+          key: cargo-linux-${{ matrix.target }}-${{ hashFiles('rs/Cargo.lock') }}
+          restore-keys: |
+            cargo-linux-${{ matrix.target }}-
+
       - name: 构建
         run: |
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
@@ -68,10 +78,8 @@ jobs:
       - name: 校验产物
         run: |
           BIN=${{ github.workspace }}/rs/target/${{ matrix.target }}/release/cpa-sync
-          echo "-- 产物定位 --"
           find . -type f -name cpa-sync -path '*release*' -exec ls -lh {} \;
           file "$BIN"
-          ls -lh "$BIN"
           test -x "$BIN"
 
       - name: 上传产物
@@ -82,53 +90,108 @@ jobs:
           if-no-files-found: error
           compression-level: 1
 
-  # ---------------- macOS ----------------
-  macos:
-    runs-on: macos-latest
+  # ---------------- macOS（ubuntu + osxcross 交叉，编译免费） ----------------
+  macos-build:
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: rs
     steps:
       - uses: actions/checkout@v4
 
+      - name: 安装 osxcross + SDK（首次 ~9 分钟，SDK 来自 joseluisq/macosx-sdks）
+        uses: Timmmm/setup-osxcross@v2
+        with:
+          osx-version: "12.3"
+
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
 
-      - name: 构建 aarch64（runner 原生架构）
-        run: cargo build --release --target aarch64-apple-darwin
+      - name: cargo 缓存
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rs/target
+          key: cargo-macos-${{ hashFiles('rs/Cargo.lock') }}
+          restore-keys: |
+            cargo-macos-
 
-      - name: 构建 x86_64（同一 SDK 交叉）
+      - name: 构建 x86_64-apple-darwin
+        env:
+          CC_x86_64_apple_darwin: o64-clang
+          CXX_x86_64_apple_darwin: o64-clang++
+          CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER: o64-clang
+          LIBZ_SYS_STATIC: "1"
         run: cargo build --release --target x86_64-apple-darwin
 
-      - name: 合并成 universal
-        run: |
-          mkdir out
-          T=${{ github.workspace }}/rs
-          find "$T" -type f -name cpa-sync -path '*release*' -exec ls -lh {} \;
-          lipo -create -output out/cpa-sync \
-            "$T/target/aarch64-apple-darwin/release/cpa-sync" \
-            "$T/target/x86_64-apple-darwin/release/cpa-sync"
-          lipo -info out/cpa-sync
-          file out/cpa-sync
-          codesign --force --sign - out/cpa-sync   # ad-hoc 签名，防 Gatekeeper 拦
+      - name: 构建 aarch64-apple-darwin
+        env:
+          CC_aarch64_apple_darwin: oa64-clang
+          CXX_aarch64_apple_darwin: oa64-clang++
+          CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER: oa64-clang
+          LIBZ_SYS_STATIC: "1"
+        run: cargo build --release --target aarch64-apple-darwin
 
-      - name: 上传产物
+      - name: 校验产物
+        run: |
+          find . -type f -name cpa-sync -path '*apple-darwin*release*' -exec file {} \;
+
+      - name: 上传 x86_64
         uses: actions/upload-artifact@v4
         with:
-          name: cpa-sync-universal-apple
-          path: rs/out/cpa-sync
+          name: cpa-sync-x86_64-apple-darwin
+          path: rs/target/x86_64-apple-darwin/release/cpa-sync
+          if-no-files-found: error
+          compression-level: 1
+
+      - name: 上传 aarch64
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpa-sync-aarch64-apple-darwin
+          path: rs/target/aarch64-apple-darwin/release/cpa-sync
+          if-no-files-found: error
+          compression-level: 1
+
+  # ---------------- macOS 签名（macos-latest，只签名，500 分钟额度用一点点） ----------------
+  macos-sign:
+    runs-on: macos-latest
+    needs: macos-build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 下载 macOS 产物
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cpa-sync-*-apple-darwin
+          path: dist
+          merge-multiple: true
+
+      - name: ad-hoc 签名
+        run: |
+          find dist -type f -name cpa-sync | while read f; do
+            echo "-- 签名 $f --"
+            codesign --force --sign - "$f"
+            codesign --verify "$f" && echo "  验证通过"
+          done
+
+      - name: 上传签名产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpa-sync-macos-signed
+          path: dist/**/cpa-sync
           if-no-files-found: error
           compression-level: 1
 
   # ---------------- 汇总 ----------------
   summary:
-    needs: [linux, macos]
+    needs: [linux, macos-sign]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: 下载全部产物
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: dist
       - name: 列表 + 校验和
