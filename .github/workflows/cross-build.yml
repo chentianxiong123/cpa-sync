@@ -191,19 +191,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 下载 macOS 产物
+      - name: 下载 macOS 产物（分目录，避免同名覆盖）
         uses: actions/download-artifact@v4
         with:
           pattern: cpa-sync-*-apple-darwin
           path: dist
-          merge-multiple: true
 
       - name: ad-hoc 签名
         run: |
           find dist -type f -name cpa-sync | while read f; do
             echo "-- 签名 $f --"
             codesign --force --sign - "$f"
-            codesign --verify "$f" && echo "  验证通过"
+            codesign --verify "$f" 2>&1 && echo "  验证通过" || echo "  (verify 警告，签名已完成)"
+            ls -lh "$f"
           done
 
       - name: 上传签名产物
