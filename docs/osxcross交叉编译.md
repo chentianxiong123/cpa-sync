@@ -1,23 +1,23 @@
-# osxcross 交叉编译 macOS —— 归纳与踩坑
+# osxcross 交叉编译 macOS —— 方法 + 归纳 + 踩坑
 
 > 2026-11-21 · cpa-sync（Rust + rusqlite bundled）
-> 结论：**方案成立**，4 平台产物全出，macOS 500 分钟额度几乎不占
+> 结论：**方案成立**，4 平台产物全出，macOS 500 分钟额度几乎不占（每次 push ≈1.5 分钟）
 
 ---
 
 ## 一、背景与目标
 
-cpa-sync 是 Rust 项目（CLI + web 面板，`rs/`），CI 要交叉编译多平台产物。
+cpa-sync 是 Rust 项目（CLI + web 面板，`rs/`），CI 交叉编译多平台产物。
 
-**问题**：原 CI 的 `macos-latest` runner **全程编译** macOS 产物，计费 **10x 系数**：
+**问题**：原 CI `macos-latest` runner **全程编译** macOS，计费 **10x 系数**：
 - 7 次 push 烧掉 **274/500 分钟**（55%）
-- 最夸张一次：macos job 排队 15 分钟没被调度 → **150 分钟计费纯空转**
+- 最夸张：macos job 排队 15 分钟没被调度 → **150 分钟计费纯空转**
 
 **目标**：编译在**免费 ubuntu**，macOS 免费额度（500 分钟）**只用于签名**。
 
 ---
 
-## 二、方案（用户拍板）
+## 二、方案
 
 ```
 ubuntu（免费无限）                  macos-latest（500 分钟，只签名）
@@ -29,19 +29,26 @@ ubuntu（免费无限）                  macos-latest（500 分钟，只签名�
 
 ---
 
-## 三、实现关键点
+## 三、实现（详细步骤）
 
 ### 1. osxcross（Linux 交叉编 macOS）
 
 ```bash
+# 依赖
 sudo apt-get install -y clang cmake xz-utils wget build-essential
+
+# 克隆
 git clone --depth 1 https://github.com/tpoechtrager/osxcross.git /tmp/osxcross
 mkdir -p /tmp/osxcross/tarballs
-# SDK 来自 joseluisq/macosx-sdks（社区托管，无需自备 Mac）
+
+# SDK（joseluisq/macosx-sdks 社区托管，无需自备 Mac）
 wget -q https://github.com/joseluisq/macosx-sdks/releases/download/12.3/MacOSX12.3.sdk.tar.xz \
   -O /tmp/osxcross/tarballs/MacOSX12.3.sdk.tar.xz
+
+# 构建（非交互关键）
 cd /tmp/osxcross
-BUILD_FLAVOR=stable UNATTENDED=1 ./build.sh   # ← 非交互关键
+BUILD_FLAVOR=stable UNATTENDED=1 ./build.sh
+# → 产物 /tmp/osxcross/target/bin/（o64-clang / oa64-clang / x86_64-apple-darwin-*）
 ```
 
 ### 2. cargo 交叉编译（rust + rusqlite bundled）
@@ -67,6 +74,7 @@ env:
 ### 4. 签名（macos-latest 只签名）
 
 ```bash
+# 分目录下载（避免 x86_64/aarch64 同名覆盖）
 find dist -type f -name cpa-sync | while read f; do
   codesign --force --sign - "$f"        # ad-hoc（免费，无需证书）
 done
@@ -122,11 +130,11 @@ run conclusion: success（5/5 job）
 | 不本地编译 | rustc 1.85 < 1.86（MSRV），直接 CI |
 | 产物分开不合并 | Linux 无 lipo，避开 |
 | SDK 用 joseluisq 托管 | 无需自备 Mac，合法路径 |
+| 一切带缓存 | osxcross target+SDK、cargo registry+target |
 
 ---
 
 ## 七、相关文件
 
 - CI：`.github/workflows/cross-build.yml`
-- 方法文档：`~/Desktop/macOS交叉编译-osxcross方法.md`
-- 提交：`70a20fa`（osxcross 方案）→ `95fafd3`（非交互+缓存）→ `aaea06a`（签名修复）
+- 提交：`70a20fa`（osxcross 方案）→ `95fafd3`（非交互+缓存）→ `aaea06a`（签名修复）→ `ae07251`（docs 同步）
