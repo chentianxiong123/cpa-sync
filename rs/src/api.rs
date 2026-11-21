@@ -69,7 +69,18 @@ pub fn panel_cfg() -> (String, String) {
 pub fn get_panel_config() -> Value {
     let (_, bind) = panel_cfg();
     let (auth, _) = panel_cfg();
-    json!({"ok": true, "auth_set": !auth.is_empty(), "bind": bind})
+    let g = gateway_cfg();
+    let upstreams = g.upstreams;
+    json!({
+        "ok": true, "auth_set": !auth.is_empty(), "bind": bind,
+        "topology": {
+            "listen": g.listen,
+            "panel_port": g.panel_port,
+            "upstream_count": upstreams.len(),
+            "upstreams": upstreams,
+            "nginx_needed": upstreams.len() > 1,
+        }
+    })
 }
 
 /// 对应 set_panel_config()：写 gateway.yaml panel 段

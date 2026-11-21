@@ -108,6 +108,12 @@
   </div>
 </div>
 
+<!-- 上游拓扑（nginx 必要性）-->
+<div id="card-topology" class="hide" style="max-width:1000px;margin:10px auto 0;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px">
+  <div class="ch"><span class="n">🌐</span>上游拓扑 <span class="sub">nginx 是否必需由上游数量决定</span></div>
+  <div class="body" id="topology-body">加载中…</div>
+</div>
+
 <main>
   <!-- ① CPA 网关 -->
   <section class="card">
@@ -591,8 +597,23 @@ async function loadVersion(){
   const r=await api("/api/version");
   if(r.ok){$("ver").textContent=r.cpa_sync||"?";$("ver-adapters").textContent=r.adapters+" adapter";}
 }
+async function loadTopology(){
+  const r=await api("/api/panel/config");
+  if(!r||!r.topology){$("card-topology").classList.add("hide");return;}
+  const t=r.topology;
+  $("card-topology").classList.remove("hide");
+  const need=t.nginx_needed
+    ?"✅ 需要 nginx 网关（多上游聚合 :"+t.listen+"）"
+    :"⛔ 不需要 nginx（单上游直连）";
+  $("topology-body").innerHTML=`<div class="row3">`+
+    `<div><label>上游数量</label><div style="font-weight:700">${t.upstream_count}</div></div>`+
+    `<div><label>nginx 必要性</label><div style="font-weight:700">${need}</div></div>`+
+    `<div><label>面板端口</label><div style="font-weight:700">${t.panel_port}</div></div>`+
+    `</div>`+
+    `<div style="margin-top:8px;font-size:12px;color:var(--muted)">upstreams: ${JSON.stringify(t.upstreams)}</div>`;
+}
 setMode("central");
-loadConfig();loadAdapters();loadVersion();loadModels();loadNodes();
+loadConfig();loadAdapters();loadVersion();loadTopology();loadModels();loadNodes();
 </script>
 </body>
 </html>
