@@ -77,6 +77,9 @@ async fn post_probe(Json(p): Json<Value>) -> axum::Json<Value> {
     axum::Json(api::probe_hosts(hosts))
 }
 
+async fn get_probe_cache() -> axum::Json<Value> { axum::Json(api::get_probe_cache()) }
+async fn post_probe_cache(Json(p): Json<Value>) -> axum::Json<Value> { axum::Json(api::set_probe_cache(&p)) }
+
 async fn post_run(Json(p): Json<Value>) -> axum::Json<Value> {
     let mode = p.get("mode").and_then(|v| v.as_str()).unwrap_or("central");
     let cmd = p.get("cmd").and_then(|v| v.as_str()).unwrap_or("");
@@ -138,6 +141,7 @@ async fn main() {
         .route("/api/models", get(|| async { axum::Json(api::get_models().await) }))
         .route("/api/nodes", get(|| async { axum::Json(api::get_nodes().await) }))
         .route("/api/probe", post(post_probe))
+        .route("/api/probe/cache", get(get_probe_cache).post(post_probe_cache))
         .route("/api/panel/config", get(|| async { axum::Json(api::get_panel_config()) }).post(post_panel_config))
         .route("/api/version", get(|| async { let v = api::get_version(); axum::Json(serde_json::json!({"ok": true, "cpa_sync": v.get("cpa_sync").cloned().unwrap_or_default(), "agent_sync": v.get("agent_sync").cloned().unwrap_or_default(), "adapters": v.get("adapters").cloned().unwrap_or_default()})) }))
         .route("/api/nodes/config", post(post_nodes_config))

@@ -107,6 +107,43 @@ pub fn set_panel_config(payload: &Value) -> Value {
 }
 
 
+/// 探测结果缓存：存 gateway.yaml 的 gateway.probe_cache 段（按 host 记录上次探测）。
+pub fn get_probe_cache() -> Value {
+    let p = root().join("config").join("gateway.yaml");
+    let raw = read_yaml_json(&p);
+    let pc = raw.get("gateway").and_then(|g| g.get("probe_cache")).cloned().unwrap_or(Value::Null);
+    json!({"ok": true, "probe_cache": pc})
+}
+
+/// 写探测结果缓存（前端手动触发探测后回写）。payload: {host, result, probed_at}。
+/// result 为 null 时 = 删除该 host 的缓存条目。
+pub fn set_probe_cache(payload: &Value) -> Value {
+    let path = root().join("config").join("gateway.yaml");
+    let raw = read_yaml_json(&path);
+    let mut m = raw.as_object().cloned().unwrap_or_default();
+    let mut gw = m.get("gateway").cloned().unwrap_or(Value::Object(Default::default()));
+    let mut pc = gw.get("probe_cache").cloned().unwrap_or(Value::Object(Default::default()));
+    let host = payload.get("host").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    if !host.is_empty() {
+        if let Some(pcm) = pc.as_object_mut() {
+            if payload.get("result").map(|v| v.is_null()).unwrap_or(false) {
+                pcm.remove(&host); // 删除缓存条目
+            } else {
+                let mut entry = serde_json::Map::new();
+                if let Some(r) = payload.get("result") { entry.insert("result".into(), r.clone()); }
+                if let Some(t) = payload.get("probed_at") { entry.insert("probed_at".into(), t.clone()); }
+                pcm.insert(host, Value::Object(entry));
+            }
+        }
+    }
+    if let Some(g) = gw.as_object_mut() { g.insert("probe_cache".into(), pc); }
+    m.insert("gateway".into(), gw);
+    match write_yaml_json(&path, &Value::Object(m)) {
+        Ok(_) => json!({"ok": true}),
+        Err(e) => json!({"ok": false, "error": e.to_string()}),
+    }
+}
+
 /// 对应 _mgmt()：调 CPA 管理 API /v8/management/<path>
 pub async fn mgmt(node: &Value, path: &str, method: &str, data: Option<&Value>) -> (u16, Value) {
     let key = gateway_cfg().key;

@@ -215,6 +215,16 @@
       <label style="margin-top:16px">同步目标 targets</label>
       <div class="checks" id="targets"></div>
       <div class="hint">targets 空=全部 adapter</div>
+      <label style="margin-top:16px">🔍 Agent 嗅探（探测各机装了什么 · 结果存配置可复用）</label>
+      <div class="row">
+        <div><label>目标主机</label><select id="probe-hosts"><option value="">全部主机</option></select></div>
+      </div>
+      <div class="btns">
+        <button class="primary" onclick="runProbe()">🔍 探测选中主机</button>
+        <button onclick="loadProbeCache()">📋 查看缓存结果</button>
+        <button onclick="clearProbeCache()">🧹 清空缓存</button>
+      </div>
+      <div class="log" id="log-probe" style="margin-top:8px;min-height:80px"><span class="t">— 点「探测选中主机」自动嗅探装了的 agent；结果写进 config，下次直接看缓存。</span></div>
     </div>
   </section>
 
@@ -587,7 +597,7 @@ function buildAdapters(){
 /* ---- 初始化 ---- */
 async function loadConfig(){
   const r=await api("/api/config");
-  if(r.ok)fillForm(r.config);
+  if(r.ok){fillForm(r.config);fillProbeHosts();}
 }
 async function loadAdapters(){
   const r=await api("/api/adapters");
@@ -614,6 +624,52 @@ async function loadTopology(){
 }
 setMode("central");
 loadConfig();loadAdapters();loadVersion();loadTopology();loadModels();loadNodes();
+
+/* ---- Agent 嗅探（探测 + 缓存）---- */
+function fillProbeHosts(){
+  const names=Object.keys(CONFIG.hosts||{});
+  const cur=$("probe-hosts").value;
+  $("probe-hosts").innerHTML=`<option value="">全部主机</option>`+
+    names.map(n=>`<option ${n===cur?"selected":""}>${n}</option>`).join("");
+}
+async function runProbe(){
+  const hosts=$("probe-hosts").value||"";
+  log("🔍 探测"+(hosts||"全部主机")+"…",null,$("log-probe"));
+  const r=await api("/api/probe",{hosts});
+  if(!r.ok){log("✗ "+(r.error||"探测失败"),"err",$("log-probe"));return;}
+  let out="";
+  for(const h of r.hosts){
+    if(!h.reachable){out+="\n✗ "+h.host+": "+(h.error||"不可达");continue;}
+    out+="\n═══ "+h.host+" ("+h.platform+") ═══";
+    out+="\n  已装: "+(h.installed_agents.join(", ")||"(无)");
+    // 写缓存
+    await api("/api/probe/cache",{host:h.host,result:h,probed_at:new Date().toISOString()});
+  }
+  log(out||"(无结果)","ok",$("log-probe"));
+  log("✓ 结果已写入 config/gateway.yaml (gateway.probe_cache)","ok",$("log-probe"));
+}
+async function loadProbeCache(){
+  const r=await api("/api/probe/cache");
+  const pc=r.probe_cache||{};
+  const hosts=Object.keys(pc);
+  if(!hosts.length){log("(无缓存，先点「探测选中主机」)",null,$("log-probe"));return;}
+  let out="📋 缓存的探测结果（config 持久化）:";
+  for(const h of hosts){
+    const e=pc[h];
+    out+="\n═══ "+h+" ═══";
+    out+="\n  探测时间: "+(e.probed_at||"?");
+    out+="\n  已装: "+((e.result&&e.result.installed_agents||[]).join(", ")||"(无)");
+  }
+  log(out,null,$("log-probe"));
+}
+async function clearProbeCache(){
+  if(!confirm("确认清空所有主机的嗅探缓存？"))return;
+  // 逐个写空（无 del 端点，用 set 空覆盖）
+  const r=await api("/api/probe/cache");
+  const hosts=Object.keys(r.probe_cache||{});
+  for(const h of hosts){await api("/api/probe/cache",{host:h,result:null,probed_at:""});}
+  log("✓ 已清空 "+hosts.length+" 个主机的嗅探缓存","ok",$("log-probe"));
+}
 </script>
 </body>
 </html>
