@@ -86,6 +86,21 @@ impl RemoteIO {
         self.run(&["ssh", "-o", "BatchMode=yes", &host, &cmd]).map(|o| o.contains("YES")).unwrap_or(false)
     }
 
+    /// 测路径存不存在（目录或文件均可）。unix 用 [ -e ]，win 用 if exist。
+    /// probe 探「装没装」用：目录存在即算，不纠结是文件还是目录。
+    pub fn path_exists_any(&self, path: &str) -> bool {
+        if self.is_local() { return PathBuf::from(path).exists(); }
+        if path.is_empty() { return false; }
+        let host = self.host.clone().unwrap_or_default();
+        let cmd = if self.platform() == "unix" {
+            format!("[ -e \"{}\" ] && echo YES || echo NO", path)
+        } else {
+            let p = path.replace('"', "");
+            format!("if exist {} (echo YES) else (echo NO)", p)
+        };
+        self.run(&["ssh", "-o", "BatchMode=yes", &host, &cmd]).map(|o| o.contains("YES")).unwrap_or(false)
+    }
+
     /// 对应 backup()
     pub fn backup(&self, path: &str) -> Option<String> {
         if !self.exists(path) { return None; }
