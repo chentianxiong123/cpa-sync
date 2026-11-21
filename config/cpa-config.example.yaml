@@ -71,7 +71,13 @@ hosts:
 # name 是接入点名（用于 CLI --host 选择 / GUI 勾选）
 adapter_instances:
   omp:
-    - { name: win11, host: win11, path: "C:\\Users\\a1\\.omp\\agent\\models.yml" }
+    # omp 深度裁剪（可选）：enabledModels 白名单写进 omp config.yml，
+    # 只保留列出的模型（支持 Glob：provider/modelId + bare id），其余裁掉。
+    # config_path：omp config.yml 路径（默认推导 path 目录/agent/config.yml）。
+    # 例：web 引擎只留三家可用（exa/parallel/tavily），其余 18 家占位裁掉。
+    - { name: win11, host: win11, path: "C:\\Users\\a1\\.omp\\agent\\models.yml",
+        config_path: "C:\\Users\\a1\\.omp\\agent\\config.yml",
+        enabled_models: ["cpa/*", "sensenova/*", "exa", "parallel", "tavily"] }
     - { name: macos, host: macos, path: "/Users/a1/.omp/agent/models.yml" }
   dsh:
     - { name: win11, host: win11, path: "C:\\Users\\a1\\.dsh\\profiles\\web\\cordis.patch.yml" }

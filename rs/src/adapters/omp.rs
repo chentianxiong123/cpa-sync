@@ -5,12 +5,24 @@ use crate::core::remote::RemoteIO;
 use crate::adapters::{Adapter, AdapterInstance, Rendered, base_diff};
 use serde_yaml::{Mapping, Value as YV};
 
-pub struct OmpAdapter { pub path: String, pub io: RemoteIO }
+pub struct OmpAdapter { pub path: String, pub io: RemoteIO, pub enabled_models: Vec<String>, pub config_path: String }
 
 impl OmpAdapter {
     pub fn new(inst: &AdapterInstance) -> Self {
         let path = inst.path.clone().unwrap_or_else(|| Self::default_path());
-        OmpAdapter { path, io: RemoteIO::new(inst.host.as_deref(), inst.platform.as_deref()) }
+        let config_path = inst.config_path.clone().unwrap_or_else(|| Self::default_config_path(&path));
+        OmpAdapter {
+            path,
+            io: RemoteIO::new(inst.host.as_deref(), inst.platform.as_deref()),
+            enabled_models: inst.enabled_models.clone().unwrap_or_default(),
+            config_path,
+        }
+    }
+    fn default_config_path(path: &str) -> String {
+        // omp 18.x：~/.omp/agent/config.yml（agent 子目录）；旧版退化根 config.yml
+        let p = std::path::Path::new(path);
+        let dir = p.parent().unwrap_or(std::path::Path::new("."));
+        dir.join("agent").join("config.yml").to_string_lossy().into_owned()
     }
     fn default_path() -> String {
         if let Ok(p) = std::env::var("OMP_AGENTS_YAML") { return p; }
@@ -125,6 +137,26 @@ impl Adapter for OmpAdapter {
 
     fn write(&self, rendered: &Rendered, backup: bool) -> Result<(), String> {
         if backup { self.io.backup(&self.path); }
-        self.io.write(&self.path, &rendered.to_text()).map_err(|e| e.to_string())
+        self.io.write(&self.path, &rendered.to_text()).map_err(|e| e.to_string())?;
+        if !self.enabled_models.is_empty() {
+            self.write_enabled_models()?;
+        }
+        Ok(())
+    }
+
+    /// 深度裁剪：把 enabled_models 白名单写进 omp config.yml（保留其它字段）
+    fn write_enabled_models(&self) -> Result<(), String> {
+        let cfg = if self.config_path.is_empty() { Self::default_config_path(&self.path) } else { self.config_path.clone() };
+        let mut data: YV = self.io.read(&cfg)
+            .and_then(|t| serde_yaml::from_str(&t).ok())
+            .unwrap_or_else(|| YV::Mapping(Default::default()));
+        if let Some(m) = data.as_mapping_mut() {
+            m.insert(
+                YV::String("enabledModels".into()),
+                YV::Sequence(self.enabled_models.iter().map(|s| YV::String(s.clone())).collect()),
+            );
+        }
+        let txt = serde_yaml::to_string(&data).map_err(|e| e.to_string())?;
+        self.io.write(&cfg, &txt).map_err(|e| e.to_string())
     }
 }

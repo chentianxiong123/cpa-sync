@@ -91,6 +91,12 @@ pub struct AdapterInstance {
     pub path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub platform: Option<String>,
+    /// omp 深度裁剪：enabledModels 白名单（如 ["cpa/*", "sensenova/*", "exa", "parallel", "tavily"]）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled_models: Option<Vec<String>>,
+    /// omp config.yml 路径（写 enabledModels 用；默认推导 path 同目录）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
