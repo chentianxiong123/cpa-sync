@@ -24,6 +24,21 @@ impl OmpAdapter {
         let dir = p.parent().unwrap_or(std::path::Path::new("."));
         dir.join("agent").join("config.yml").to_string_lossy().into_owned()
     }
+    /// 深度裁剪：把 enabled_models 白名单写进 omp config.yml（保留其它字段）
+    fn write_enabled_models(&self) -> Result<(), String> {
+        let cfg = if self.config_path.is_empty() { Self::default_config_path(&self.path) } else { self.config_path.clone() };
+        let mut data: YV = self.io.read(&cfg)
+            .and_then(|t| serde_yaml::from_str(&t).ok())
+            .unwrap_or_else(|| YV::Mapping(Default::default()));
+        if let Some(m) = data.as_mapping_mut() {
+            m.insert(
+                YV::String("enabledModels".into()),
+                YV::Sequence(self.enabled_models.iter().map(|s| YV::String(s.clone())).collect()),
+            );
+        }
+        let txt = serde_yaml::to_string(&data).map_err(|e| e.to_string())?;
+        self.io.write(&cfg, &txt).map_err(|e| e.to_string())
+    }
     fn default_path() -> String {
         if let Ok(p) = std::env::var("OMP_AGENTS_YAML") { return p; }
         let home = std::env::var("USERPROFILE").ok().or_else(|| std::env::var("HOME").ok()).unwrap_or_default();
@@ -142,21 +157,5 @@ impl Adapter for OmpAdapter {
             self.write_enabled_models()?;
         }
         Ok(())
-    }
-
-    /// 深度裁剪：把 enabled_models 白名单写进 omp config.yml（保留其它字段）
-    fn write_enabled_models(&self) -> Result<(), String> {
-        let cfg = if self.config_path.is_empty() { Self::default_config_path(&self.path) } else { self.config_path.clone() };
-        let mut data: YV = self.io.read(&cfg)
-            .and_then(|t| serde_yaml::from_str(&t).ok())
-            .unwrap_or_else(|| YV::Mapping(Default::default()));
-        if let Some(m) = data.as_mapping_mut() {
-            m.insert(
-                YV::String("enabledModels".into()),
-                YV::Sequence(self.enabled_models.iter().map(|s| YV::String(s.clone())).collect()),
-            );
-        }
-        let txt = serde_yaml::to_string(&data).map_err(|e| e.to_string())?;
-        self.io.write(&cfg, &txt).map_err(|e| e.to_string())
     }
 }

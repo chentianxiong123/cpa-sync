@@ -149,7 +149,7 @@ impl SyncConfig {
                             let platform = i.platform.clone().or_else(|| {
                                 hosts.get(&i.host).map(|h| h.platform.clone())
                             });
-                            AdapterInstance { name: i.name, host: i.host, path: i.path, platform }
+                            AdapterInstance { name: i.name, host: i.host, path: i.path, platform, enabled_models: i.enabled_models, config_path: i.config_path }
                         }).collect();
                         adapter_instances.insert(s.into(), fixed);
                     }

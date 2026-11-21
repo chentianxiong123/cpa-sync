@@ -41,6 +41,10 @@ pub struct AdapterInstance {
     pub host: Option<String>,
     pub path: Option<String>,
     pub platform: Option<String>,
+    /// omp 深度裁剪：enabledModels 白名单
+    pub enabled_models: Option<Vec<String>>,
+    /// omp config.yml 路径（写 enabledModels 用）
+    pub config_path: Option<String>,
 }
 
 /// 对应 adapters.base.Adapter
