@@ -60,6 +60,9 @@ pub trait Adapter: Send {
     fn render(&self, ir: &ProviderIR) -> Rendered;
     /// 对应 write()
     fn write(&self, rendered: &Rendered, backup: bool) -> Result<(), String>;
+    /// 总是同步的副作用（如 omp enabledModels 写 config.yml）；默认无。
+    /// 即使主配置无 diff（无变更）也会调用，确保深度裁剪始终下发。
+    fn side_effects(&self) -> Result<(), String> { Ok(()) }
 }
 
 /// 对应 adapters.available_names()

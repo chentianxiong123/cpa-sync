@@ -152,10 +152,12 @@ impl Adapter for OmpAdapter {
 
     fn write(&self, rendered: &Rendered, backup: bool) -> Result<(), String> {
         if backup { self.io.backup(&self.path); }
-        self.io.write(&self.path, &rendered.to_text()).map_err(|e| e.to_string())?;
-        if !self.enabled_models.is_empty() {
-            self.write_enabled_models()?;
-        }
-        Ok(())
+        self.io.write(&self.path, &rendered.to_text()).map_err(|e| e.to_string())
+    }
+
+    /// 深度裁剪副作用：enabledModels 写 config.yml（总是同步，即使 models 无 diff）
+    fn side_effects(&self) -> Result<(), String> {
+        if self.enabled_models.is_empty() { return Ok(()); }
+        self.write_enabled_models()
     }
 }

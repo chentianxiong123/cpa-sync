@@ -95,7 +95,9 @@ pub async fn apply(cfg_path: &str, dry_run: bool, sync_only: &[String]) -> Value
             let cur = adapter.load_current();
             let diff_lines = adapter.diff(&cur, &target);
             if diff_lines.is_empty() {
-                results.push(json!({"agent": agent, "instance": name, "status": "已同步", "lines": []}));
+                // 无 diff：仍同步 side_effects（如 omp enabledModels），确保深度裁剪始终下发
+                let se_ok = if dry_run { true } else { adapter.side_effects().is_ok() };
+                results.push(json!({"agent": agent, "instance": name, "status": "已同步", "lines": [], "side_effects": se_ok}));
                 continue;
             }
             if dry_run {
@@ -104,7 +106,7 @@ pub async fn apply(cfg_path: &str, dry_run: bool, sync_only: &[String]) -> Value
             }
             let rendered = adapter.render(&target);
             match adapter.write(&rendered, true) {
-                Ok(()) => { ok += 1; results.push(json!({"agent": agent, "instance": name, "status": "已应用", "lines": diff_lines})); }
+                Ok(()) => { ok += 1; let se_ok = adapter.side_effects().is_ok(); results.push(json!({"agent": agent, "instance": name, "status": "已应用", "lines": diff_lines, "side_effects": se_ok})); }
                 Err(e) => { fail += 1; results.push(json!({"agent": agent, "instance": name, "status": "失败", "error": e, "lines": diff_lines})); }
             }
         }
