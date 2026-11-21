@@ -21,6 +21,8 @@ pub fn build(cfg: &SyncConfig, agent: &str) -> Vec<(String, Box<dyn Adapter>)> {
             host: if i.host.is_empty() { None } else { Some(i.host) },
             path: if i.path.is_empty() { None } else { Some(i.path) },
             platform: i.platform,
+            enabled_models: i.enabled_models,
+            config_path: i.config_path,
         }).collect();
     match agent {
         "opencode" => OpencodeAdapter::new(&AI::default()).iter_instances(&instances),
