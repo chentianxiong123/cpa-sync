@@ -7,6 +7,7 @@ pub mod core {
     pub mod config;
     pub mod cpa_client;
     pub mod remote;
+    pub mod probe;
 }
 
 use axum::{extract::State, response::IntoResponse, routing::{get, post}, Json, Router};
@@ -71,10 +72,15 @@ async fn post_scripts(Json(p): Json<Value>) -> axum::Json<Value> {
 
 async fn post_panel_config(Json(p): Json<Value>) -> axum::Json<Value> { axum::Json(api::set_panel_config(&p)) }
 
+async fn post_probe(Json(p): Json<Value>) -> axum::Json<Value> {
+    let hosts = p.get("hosts").and_then(|v| v.as_str()).unwrap_or("");
+    axum::Json(api::probe_hosts(hosts))
+}
+
 async fn post_run(Json(p): Json<Value>) -> axum::Json<Value> {
     let mode = p.get("mode").and_then(|v| v.as_str()).unwrap_or("central");
     let cmd = p.get("cmd").and_then(|v| v.as_str()).unwrap_or("");
-    let central = ["models", "list", "check", "apply", "doctor"];
+    let central = ["models", "list", "check", "apply", "doctor", "probe"];
     let client = ["list", "check", "apply", "doctor"];
     if mode == "client" {
         if !client.contains(&cmd) {
@@ -96,13 +102,19 @@ async fn post_run(Json(p): Json<Value>) -> axum::Json<Value> {
 async fn maybe_cli(args: &[String]) -> bool {
     let first = args.iter().find(|a| !a.starts_with('-'));
     let cmd = match first { Some(v) => v.as_str(), None => return false };
-    if !matches!(cmd, "check" | "models" | "list" | "apply" | "doctor" | "sync") { return false; }
+    if !matches!(cmd, "check" | "models" | "list" | "apply" | "doctor" | "sync" | "probe") { return false; }
     let cfg = args.iter().position(|a| a == "--config")
         .and_then(|i| args.get(i + 1)).cloned().unwrap_or_default();
-    let out = if cmd == "check" { crate::cli::check(&cfg).await }
+    // --host h1,h2：中心下发选目标（只处理这些 host 的实例）
+    let hosts_csv = args.iter().position(|a| a == "--host")
+        .and_then(|i| args.get(i + 1)).cloned().unwrap_or_default();
+    let only_hosts: Vec<String> = if hosts_csv.is_empty() { vec![] }
+        else { hosts_csv.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect() };
+    let out = if cmd == "check" { crate::cli::check_hosts(&cfg, &only_hosts).await }
         else if cmd == "models" { crate::cli::models(&cfg).await }
-        else if cmd == "apply" { crate::cli::apply(&cfg, false, &[]).await }
+        else if cmd == "apply" { crate::cli::apply_hosts(&cfg, false, &[], &only_hosts).await }
         else if cmd == "doctor" { crate::cli::doctor(&cfg).await }
+        else if cmd == "probe" { crate::cli::probe(&cfg, &hosts_csv) }
         else if cmd == "sync" {
             // 交互式 TUI 向导在 Rust 版由 web 面板承担；CLI sync 输出诊断+预览，执行用 apply
             let doc = crate::cli::doctor(&cfg).await;
@@ -125,6 +137,7 @@ async fn main() {
         .route("/api/adapters", get(|| async { axum::Json(serde_json::json!({"ok": true, "names": api::get_adapters_info().get("names").cloned().unwrap_or_default(), "hosts": api::get_adapters_info().get("hosts").cloned().unwrap_or_default(), "adapter_instances": api::get_adapters_info().get("adapter_instances").cloned().unwrap_or_default(), "targets": api::get_adapters_info().get("targets").cloned().unwrap_or_default(), "strategies": api::get_adapters_info().get("strategies").cloned().unwrap_or_default()})) }))
         .route("/api/models", get(|| async { axum::Json(api::get_models().await) }))
         .route("/api/nodes", get(|| async { axum::Json(api::get_nodes().await) }))
+        .route("/api/probe", post(post_probe))
         .route("/api/panel/config", get(|| async { axum::Json(api::get_panel_config()) }).post(post_panel_config))
         .route("/api/version", get(|| async { let v = api::get_version(); axum::Json(serde_json::json!({"ok": true, "cpa_sync": v.get("cpa_sync").cloned().unwrap_or_default(), "agent_sync": v.get("agent_sync").cloned().unwrap_or_default(), "adapters": v.get("adapters").cloned().unwrap_or_default()})) }))
         .route("/api/nodes/config", post(post_nodes_config))

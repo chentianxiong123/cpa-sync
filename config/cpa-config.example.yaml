@@ -91,3 +91,10 @@ targets:
   - opencode
   - claude
   - codex
+
+# ── 中心下发选目标（host 级）与嗅探（probe）──
+# cpa-sync apply --config <cfg> [--host win11,redmi-debian]
+#   --host 省略 = 全部 host；指定 = 只同步这些机器上的实例（多系统电脑分别选）。
+# cpa-sync probe --config <cfg> [--host win11]
+#   自动嗅探选中机器上装了哪些 agent、配置文件在哪（靠 SSH test 探测），
+#   据此指导 adapter_instances 该怎么填；不做任何主机名硬编码。

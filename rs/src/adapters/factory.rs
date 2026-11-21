@@ -14,7 +14,13 @@ use super::pi::PiAdapter;
 
 /// 从 SyncConfig 的 adapter_instances 构造某 agent 的所有实例
 pub fn build(cfg: &SyncConfig, agent: &str) -> Vec<(String, Box<dyn Adapter>)> {
+    build_filtered(cfg, agent, &[])
+}
+
+/// 只构造 host 在 only_hosts 里的实例（空 = 不过滤）。中心下发选目标用。
+pub fn build_filtered(cfg: &SyncConfig, agent: &str, only_hosts: &[String]) -> Vec<(String, Box<dyn Adapter>)> {
     let instances: Vec<AI> = cfg.adapter_instances.get(agent).cloned().unwrap_or_default().into_iter()
+        .filter(|i| only_hosts.is_empty() || only_hosts.contains(&i.host))
         .map(|i| AI {
             name: i.name,
             // 通用语义：host 为空 = 本机模式（对照 Python 的 `self.host or None`）

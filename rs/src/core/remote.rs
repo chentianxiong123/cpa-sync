@@ -76,9 +76,12 @@ impl RemoteIO {
         if self.is_local() { return PathBuf::from(path).exists(); }
         let host = self.host.clone().unwrap_or_default();
         let cmd = if self.platform() == "unix" {
+            // unix: [ -f "$HOME/x" ]，ssh 传过去由远端 shell 展开 $HOME
             format!("[ -f \"{}\" ] && echo YES || echo NO", path)
         } else {
-            format!("if exist \"{}\" (echo YES) else (echo NO)", path)
+            // win: %USERPROFILE% 在引号内 cmd 不展开，改去引号让远端 cmd 展开
+            let p = path.replace('"', "");
+            format!("if exist {} (echo YES) else (echo NO)", p)
         };
         self.run(&["ssh", "-o", "BatchMode=yes", &host, &cmd]).map(|o| o.contains("YES")).unwrap_or(false)
     }

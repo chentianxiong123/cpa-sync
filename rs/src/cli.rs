@@ -45,6 +45,11 @@ async fn pull_target(cfg: &SyncConfig) -> Result<(ProviderIR, usize), String> {
 
 /// 对应 cpa-sync check
 pub async fn check(cfg_path: &str) -> Value {
+    check_hosts(cfg_path, &[]).await
+}
+
+/// check + 只处理指定 host 的实例（空 = 全部）
+pub async fn check_hosts(cfg_path: &str, only_hosts: &[String]) -> Value {
     let cfg = match SyncConfig::load(config_path(cfg_path.to_string()).as_deref()) {
         Ok(c) => c,
         Err(e) => return json!({"ok": false, "error": e.to_string()}),
@@ -56,7 +61,7 @@ pub async fn check(cfg_path: &str) -> Value {
     let mut diffs = Vec::new();
     let mut agents = 0usize;
     for agent in pick_agents(&cfg, &[String::new()]) {
-        let insts = adapters::factory::build(&cfg, agent.as_str());
+        let insts = adapters::factory::build_filtered(&cfg, agent.as_str(), only_hosts);
         for (name, adapter) in insts {
             if adapter.diff(&None, &target).is_empty() { continue; }
             let cur = adapter.load_current();
@@ -77,7 +82,13 @@ pub async fn check(cfg_path: &str) -> Value {
 }
 
 /// 对应 cpa-sync apply
+/// 对应 cpa-sync apply
 pub async fn apply(cfg_path: &str, dry_run: bool, sync_only: &[String]) -> Value {
+    apply_hosts(cfg_path, dry_run, sync_only, &[]).await
+}
+
+/// apply + 只处理指定 host（空 = 全部）。中心下发选目标用。
+pub async fn apply_hosts(cfg_path: &str, dry_run: bool, sync_only: &[String], only_hosts: &[String]) -> Value {
     let cfg = match SyncConfig::load(config_path(cfg_path.to_string()).as_deref()) {
         Ok(c) => c,
         Err(e) => return json!({"ok": false, "error": e.to_string()}),
@@ -90,7 +101,7 @@ pub async fn apply(cfg_path: &str, dry_run: bool, sync_only: &[String]) -> Value
     let mut ok = 0usize;
     let mut fail = 0usize;
     for agent in pick_agents(&cfg, sync_only) {
-        let insts = adapters::factory::build(&cfg, agent.as_str());
+        let insts = adapters::factory::build_filtered(&cfg, agent.as_str(), only_hosts);
         for (name, adapter) in insts {
             let cur = adapter.load_current();
             let diff_lines = adapter.diff(&cur, &target);
@@ -143,6 +154,11 @@ pub async fn models(cfg_path: &str) -> Value {
     json!({"ok": true, "models_total": total, "kept": list.len(), "models": list})
 }
 
+/// 对应 cpa-sync probe：探测选中 host 上的 agent 安装情况
+pub fn probe(cfg_path: &str, hosts_csv: &str) -> Value {
+    crate::core::probe::probe(cfg_path, hosts_csv)
+}
+
 /// 对应 cpa-sync list：列出全部 agent 的实例（不发网络）
 pub fn list(cfg_path: &str) -> Value {
     let cfg = match SyncConfig::load(config_path(cfg_path.to_string()).as_deref()) {
@@ -165,6 +181,8 @@ pub async fn run_central(cmd: &str) -> (i32, String) {
         cli_apply("").await
     } else if arg.starts_with("models") {
         cli_models("").await
+    } else if arg.starts_with("probe") {
+        probe("", "")
     } else {
         check("").await
     };

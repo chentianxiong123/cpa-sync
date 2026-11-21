@@ -409,6 +409,11 @@ pub fn get_adapters_info() -> Value {
            "strategies": ["replace", "merge"]})
 }
 
+/// 探测选中 host 上的 agent 安装情况（web 面板「嗅探」用）。
+pub fn probe_hosts(hosts_csv: &str) -> Value {
+    crate::core::probe::probe("", hosts_csv)
+}
+
 /// 对应 get_version()
 pub fn get_version() -> Value {
     let mut ver = String::from("?");
@@ -426,7 +431,7 @@ pub fn get_version() -> Value {
 /// 命令执行（对应 run_central/run_client/run_script）
 pub async fn run_central(name: &str) -> Value {
     match name {
-        "models" | "list" | "check" | "apply" | "doctor" => {
+        "models" | "list" | "check" | "apply" | "doctor" | "probe" => {
             let code = crate::cli::run_central(name).await;
             json!({"code": code.0, "output": code.1})
         }
